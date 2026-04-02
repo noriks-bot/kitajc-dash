@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Report - Noriks Analytics</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/dashboard/styles.css?v=20260224bd">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Stock Report specific styles */
+        .stock-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .stock-card {
+            background: var(--card-bg);
+            border-radius: var(--card-radius);
+            box-shadow: var(--card-shadow);
+            padding: 20px;
+            text-align: center;
+        }
+        .stock-card h3 {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        .stock-card .value {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+        .stock-card .subtext {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        .stock-card.info .value { color: var(--primary); }
+        .stock-card.warning .value { color: var(--warning); }
+        .stock-card.danger .value { color: var(--danger); }
+        .stock-card.ok .value { color: var(--success); }
+        
+        /* View Tabs */
+        .view-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 24px;
+            background: var(--card-bg);
+            border-radius: var(--card-radius);
+            box-shadow: var(--card-shadow);
+            padding: 6px;
+            width: fit-content;
+        }
+        .view-tab {
+            padding: 12px 24px;
+            border: none;
+            background: transparent;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+            font-family: 'Inter', sans-serif;
+        }
+        .view-tab:hover {
+            color: var(--text-primary);
+            background: var(--content-bg);
+        }
+        .view-tab.active {
+            background: var(--primary);
+            color: white;
+        }
+        .view-tab .tab-count {
+            font-size: 11px;
+            opacity: 0.8;
+            margin-left: 6px;
+        }
+        
+        .filters-card {
+            background: var(--card-bg);
+            border-radius: var(--card-radius);
+            box-shadow: var(--card-shadow);
+            padding: 20px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .filter-group label {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        .filter-group select {
+            background: var(--content-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            min-width: 150px;
+        }
+        .filter-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        .charts-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+        .chart-card {
+            background: var(--card-bg);
+            border-radius: var(--card-radius);
+            box-shadow: var(--card-shadow);
+            padding: 20px;
+        }
+        .chart-card h3 {
+            margin-bottom: 16px;
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+        .chart-wrapper {
+            position: relative;
+            height: 280px;
+        }
+        
+        .table-card {
+            background: var(--card-bg);
+            border-radius: var(--card-radius);
+            box-shadow: var(--card-shadow);
+            padding: 20px;
+            overflow-x: auto;
+        }
+        .table-card h3 {
+            margin-bottom: 16px;
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+        .stock-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .stock-table th, .stock-table td {
+            padding: 12px 14px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .stock-table th {
+            background: var(--content-bg);
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 11px;
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+        }
+        .stock-table th:hover {
+            background: #e5e7eb;
+        }
+        .stock-table th.sorted-asc::after { content: ' ↑'; }
+        .stock-table th.sorted-desc::after { content: ' ↓'; }
+        .stock-table tr:hover {
+            background: #f9fafb;
+        }
+        .stock-table tr.low-stock {
+            background: var(--danger-soft);
+        }
+        .stock-table tr.warning-stock {
+            background: var(--warning-soft);
+        }
+        .stock-table tfoot tr.totals-row {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 100%);
+            color: white;
+            font-size: 1.05em;
+            position: sticky;
+            bottom: 0;
+        }
+        .stock-table tfoot tr.totals-row td {
+            border-top: 2px solid var(--primary);
+            padding: 12px 10px;
+        }
+        
+        .color-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .color-Black { background: #333; color: #fff; }
+        .color-White { background: #f0f0f0; color: #333; border: 1px solid #ddd; }
+        .color-Grey { background: #888; color: #fff; }
+        .color-Navy { background: #1a3a5c; color: #fff; }
+        .color-Blue { background: #3498db; color: #fff; }
+        .color-Green { background: #27ae60; color: #fff; }
+        .color-Red { background: #e74c3c; color: #fff; }
+        .color-Brown { background: #8B4513; color: #fff; }
+        .color-Beige { background: #D4B896; color: #333; }
+        .color-Mixed { background: linear-gradient(90deg, #333, #888, #f0f0f0); color: #fff; }
+        .color-Midnight { background: #2c3e50; color: #fff; }
+        
+        .type-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .type-T-Shirt { background: rgba(59, 130, 246, 0.15); color: var(--primary); }
+        .type-Boxers { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+        .type-Socks { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
+        
+        .days-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .days-danger { background: var(--danger-soft); color: var(--danger); }
+        .days-warning { background: var(--warning-soft); color: var(--warning); }
+        .days-ok { background: var(--success-soft); color: var(--success); }
+        .days-infinite { background: #f3f4f6; color: var(--text-muted); }
+        
+        .stock-value {
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .stock-zero { color: var(--danger); }
+        .stock-low { color: var(--warning); }
+        .stock-negative { color: var(--danger); font-weight: 700; }
+        
+        .edit-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            opacity: 0.4;
+            font-size: 12px;
+            padding: 2px 4px;
+            margin-left: 4px;
+            transition: opacity 0.2s;
+        }
+        .edit-btn:hover { opacity: 1; }
+        
+        .edit-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            z-index: 1001;
+            display: none;
+            min-width: 300px;
+        }
+        .edit-modal.visible { display: block; }
+        .edit-modal h3 { margin: 0 0 16px 0; }
+        .edit-modal input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 16px;
+            background: var(--content-bg);
+            color: var(--text-primary);
+            margin-bottom: 16px;
+        }
+        .edit-modal .btn-row {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        .edit-modal button {
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .edit-modal .btn-cancel {
+            background: var(--content-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+        .edit-modal .btn-save {
+            background: var(--primary);
+            border: none;
+            color: white;
+        }
+        
+        /* Sparkline Trend */
+        .sparkline-cell {
+            position: relative;
+        }
+        .sparkline {
+            display: inline-block;
+            vertical-align: middle;
+            cursor: pointer;
+        }
+        .sparkline svg {
+            width: 60px;
+            height: 20px;
+        }
+        .sparkline path {
+            fill: none;
+            stroke: var(--primary);
+            stroke-width: 1.5;
+        }
+        .sparkline.up path { stroke: var(--success); }
+        .sparkline.down path { stroke: var(--danger); }
+        .sparkline.flat path { stroke: var(--text-muted); }
+        
+        /* Trend Popup */
+        .trend-popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.3);
+            z-index: 999;
+            display: none;
+        }
+        .trend-popup-overlay.visible { display: block; }
+        .trend-popup {
+            position: fixed;
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 20px;
+            z-index: 1000;
+            display: none;
+            min-width: 340px;
+            max-width: 420px;
+        }
+        .trend-popup.visible { display: block; }
+        .trend-popup h4 {
+            margin: 0 0 12px 0;
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+        .trend-popup .chart-container {
+            width: 100%;
+            height: 180px;
+            position: relative;
+        }
+        .trend-popup canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+        .trend-stats {
+            display: flex;
+            gap: 16px;
+            margin-top: 12px;
+            font-size: 12px;
+        }
+        .trend-stat {
+            text-align: center;
+        }
+        .trend-stat .label { color: var(--text-muted); }
+        .trend-stat .value { font-weight: 600; font-size: 14px; }
+        .stock-ok { color: var(--success); }
+        
+        .sales-value {
+            color: var(--primary);
+            font-weight: 500;
+        }
+        
+        .updated-text {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 12px;
+            margin-top: 24px;
+        }
+        
+        .alert-box {
+            background: var(--warning-soft);
+            border: 1px solid var(--warning);
+            border-radius: var(--card-radius);
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .alert-box.error {
+            background: var(--danger-soft);
+            border-color: var(--danger);
+        }
+        .alert-box .icon {
+            font-size: 1.5rem;
+        }
+        
+        @media (max-width: 768px) {
+            .filters-card {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .charts-row {
+                grid-template-columns: 1fr;
+            }
+            .filter-group select {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+        
+        <!-- Sidebar - FIRMA STYLE -->
+        <aside class="sidebar"></aside>
+        
+        <!-- Main Content -->
+        <main class="main">
+            <header class="topbar">
+                <div class="topbar-left">
+                    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+                    <h1 class="page-title">📦 Stock Report - Zaloga</h1>
+                </div>
+                <div class="topbar-right">
+                    <div class="status-badge">
+                        <span class="status-dot"></span>
+                        <span id="lastUpdated">Live</span>
+                    </div>
+                </div>
+            </header>
+            
+            <div class="content">
+                <div class="alert-box error" id="alertBox" style="display: none;">
+                    <span class="icon">⚠️</span>
+                    <div>
+                        <strong>Inventory not loaded!</strong><br>
+                        <span id="alertText">The Google Sheet needs to be shared with the service account.</span>
+                    </div>
+                </div>
+                
+                <!-- View Tabs -->
+                <div class="view-tabs">
+                    <button class="view-tab active" data-view="current" onclick="setView('current')">
+                        📦 TRENUTNO
+                    </button>
+                    <button class="view-tab" data-view="incoming" onclick="setView('incoming')">
+                        🚚 INCOMING <span class="tab-count" id="incomingCount"></span>
+                    </button>
+                    <button class="view-tab" data-view="total" onclick="setView('total')">
+                        📊 SKUPAJ
+                    </button>
+                </div>
+                
+                <!-- Summary Cards - Row 1: Quantities -->
+                <div class="stock-cards" id="summaryCards">
+                    <div class="stock-card info">
+                        <h3>📦 Skupaj Zaloga</h3>
+                        <div class="value" id="totalStock">-</div>
+                        <div class="subtext">Vseh kosov</div>
+                    </div>
+                    <div class="stock-card" style="border-left: 4px solid #3b82f6;">
+                        <h3>👕 Majice</h3>
+                        <div class="value" id="tshirtStock" style="color: #3b82f6;">-</div>
+                        <div class="subtext">kosov</div>
+                    </div>
+                    <div class="stock-card" style="border-left: 4px solid #ef4444;">
+                        <h3>🩲 Bokserice</h3>
+                        <div class="value" id="boxerStock" style="color: #ef4444;">-</div>
+                        <div class="subtext">kosov</div>
+                    </div>
+                    <div class="stock-card" style="border-left: 4px solid #f59e0b;">
+                        <h3>🧦 Nogavice</h3>
+                        <div class="value" id="sockStock" style="color: #f59e0b;">-</div>
+                        <div class="subtext">kosov</div>
+                    </div>
+                </div>
+                
+                <!-- Summary Cards - Row 2: Values in EUR -->
+                <div class="stock-cards">
+                    <div class="stock-card ok">
+                        <h3>💰 Vrednost Skupaj</h3>
+                        <div class="value" id="totalValue">-</div>
+                        <div class="subtext">EUR nabavna cena</div>
+                    </div>
+                    <div class="stock-card" style="border-left: 4px solid #3b82f6;">
+                        <h3>👕 Majice EUR</h3>
+                        <div class="value" id="tshirtValue" style="color: #3b82f6;">-</div>
+                        <div class="subtext">€3.50/kos</div>
+                    </div>
+                    <div class="stock-card" style="border-left: 4px solid #ef4444;">
+                        <h3>🩲 Bokserice EUR</h3>
+                        <div class="value" id="boxerValue" style="color: #ef4444;">-</div>
+                        <div class="subtext">€2.25/kos</div>
+                    </div>
+                    <div class="stock-card" style="border-left: 4px solid #f59e0b;">
+                        <h3>🧦 Nogavice EUR</h3>
+                        <div class="value" id="sockValue" style="color: #f59e0b;">-</div>
+                        <div class="subtext">€0.80/kos</div>
+                    </div>
+                </div>
+                
+                <!-- Summary Cards - Row 3: Alerts -->
+                <div class="stock-cards">
+                    <div class="stock-card warning">
+                        <h3>⚠️ Nizka Zaloga</h3>
+                        <div class="value" id="lowStockCount">-</div>
+                        <div class="subtext">&lt;14 dni zaloge</div>
+                    </div>
+                    <div class="stock-card danger">
+                        <h3>🚨 Kritična Zaloga</h3>
+                        <div class="value" id="criticalStockCount">-</div>
+                        <div class="subtext">&lt;7 dni zaloge</div>
+                    </div>
+                </div>
+                
+                <!-- Charts -->
+                <div class="charts-row">
+                    <div class="chart-card">
+                        <h3>📊 Zaloga po Tipu</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="typeChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>📊 Dni Zaloge - Distribution</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="daysChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Filters -->
+                <div class="filters-card">
+                    <div class="filter-group">
+                        <label>Product Type</label>
+                        <select id="typeFilter">
+                            <option value="">All Types</option>
+                            <option value="T-Shirt">👕 T-Shirts</option>
+                            <option value="Boxers">🩲 Boxers</option>
+                            <option value="Socks">🧦 Socks</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Color</label>
+                        <select id="colorFilter">
+                            <option value="">All Colors</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Size</label>
+                        <select id="sizeFilter">
+                            <option value="">All Sizes</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Stock Status</label>
+                        <select id="stockFilter">
+                            <option value="">All</option>
+                            <option value="critical">🚨 Critical (&lt;7 days)</option>
+                            <option value="low">⚠️ Low (&lt;14 days)</option>
+                            <option value="ok">✅ OK (14+ days)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Table -->
+                <div class="table-card">
+                    <h3>📋 Inventory by SKU (click headers to sort)</h3>
+                    <table class="stock-table" id="stockTable">
+                        <thead>
+                            <tr>
+                                <th data-sort="sku">SKU</th>
+                                <th data-sort="type">Type</th>
+                                <th data-sort="color">Color</th>
+                                <th data-sort="size">Size</th>
+                                <th data-sort="today">Danes</th>
+                                <th data-sort="yesterday">Včeraj</th>
+                                <th data-sort="sales">Total</th>
+                                <th>Trend</th>
+                                <th data-sort="stock">Zaloga</th>
+                                <th data-sort="incoming">Incoming</th>
+                                <th data-sort="days">Dni zaloge</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stockTableBody">
+                        </tbody>
+                        <tfoot id="stockTableFooter">
+                            <tr class="totals-row">
+                                <td colspan="4" style="text-align: right; font-weight: 700;">SKUPAJ:</td>
+                                <td class="sales-value" id="totalToday" style="font-weight: 700; font-size: 1.1em;">-</td>
+                                <td class="sales-value" id="totalYesterday" style="font-weight: 700; font-size: 1.1em;">-</td>
+                                <td colspan="5"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                
+                <p class="updated-text" id="updated"></p>
+            </div>
+        </main>
+    </div>
+    
+    <script>
+        // Sidebar functions (from styles.css companion)
+        function toggleSidebar() {
+            document.querySelector('.sidebar').classList.toggle('open');
+            document.querySelector('.sidebar-overlay').classList.toggle('active');
+        }
+        function toggleCollapse() {
+            const sidebar = document.querySelector('.sidebar');
+            const btn = document.querySelector('.collapse-btn');
+            sidebar.classList.toggle('collapsed');
+            const isCollapsed = sidebar.classList.contains('collapsed');
+            btn.querySelector('.collapse-text').textContent = isCollapsed ? 'Show' : 'Hide Menu';
+            btn.querySelector('.collapse-icon').textContent = isCollapsed ? '▶' : '◀';
+            localStorage.setItem('sidebarCollapsed', isCollapsed);
+        }
+        // Load saved collapse state
+        if (localStorage.getItem('sidebarCollapsed') === 'true') {
+            document.querySelector('.sidebar').classList.add('collapsed');
+            const collapseText = document.querySelector('.collapse-text');
+            const collapseIcon = document.querySelector('.collapse-icon');
+            if (collapseText) collapseText.textContent = 'Show';
+            if (collapseIcon) collapseIcon.textContent = '▶';
+        }
+        function logout() {
+            window.location.href = '/dashboard/';
+        }
+        
+        let inventoryData = null;
+        let salesData = null;
+        let incomingData = null;
+        let mergedData = [];
+        let filteredData = [];
+        let sortColumn = 'yesterday';
+        let sortDirection = 'desc';  // Sort by yesterday sales, highest first
+        let currentView = 'current';  // 'current', 'incoming', 'total'
+        
+        let typeChart, daysChart;
+        
+        const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
+        
+        // Build incoming stock map by type/color/size
+        function buildIncomingMap() {
+            const map = {};
+            if (!incomingData || !incomingData.arrivals) return map;
+            
+            incomingData.arrivals
+                .filter(a => !a.arrived)  // Only pending arrivals
+                .forEach(a => {
+                    const key = `${a.type}|${a.color}|${a.size}`;
+                    map[key] = (map[key] || 0) + a.qty;
+                });
+            return map;
+        }
+        
+        function setView(view) {
+            currentView = view;
+            document.querySelectorAll('.view-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.view === view);
+            });
+            mergeData();
+            applyFilters();
+        }
+        
+        async function loadData() {
+            try {
+                const invResponse = await fetch('inventory-data.json');
+                inventoryData = await invResponse.json();
+                
+                const salesResponse = await fetch('stock-data.json');
+                salesData = await salesResponse.json();
+                
+                // Load incoming stock data
+                try {
+                    const incResponse = await fetch('stock-arrivals.json');
+                    incomingData = await incResponse.json();
+                    const pendingCount = (incomingData.arrivals || []).filter(a => !a.arrived).length;
+                    const totalIncoming = (incomingData.arrivals || []).filter(a => !a.arrived).reduce((s, a) => s + a.qty, 0);
+                    document.getElementById('incomingCount').textContent = `(${totalIncoming.toLocaleString()})`;
+                } catch (e) {
+                    incomingData = { arrivals: [] };
+                }
+                
+                if (!inventoryData.inventory || inventoryData.inventory.length === 0) {
+                    showAlert(true, 'Inventory not loaded! Share the Google Sheet with: miki-bot@helical-indexer-483510-f9.iam.gserviceaccount.com');
+                } else {
+                    showAlert(false);
+                }
+                
+                mergeData();
+                populateFilters();
+                applyFilters();
+                
+                const daysSinceStart = salesData.daysSinceStart || 0;
+                document.getElementById('updated').textContent = 
+                    `Začetna zaloga: ${new Date(inventoryData.generated).toLocaleDateString()} | ` +
+                    `Dan 0: ${inventoryData.startDate} | ` +
+                    `Dni sledenja: ${daysSinceStart} | ` +
+                    `Prodaja posodobljena: ${new Date(salesData.generated).toLocaleString()}`;
+                    
+            } catch (err) {
+                console.error('Failed to load data:', err);
+                showAlert(true, 'Failed to load data files. Run fetch-inventory.js first.');
+            }
+        }
+        
+        function showAlert(show, message = '') {
+            const alertBox = document.getElementById('alertBox');
+            const alertText = document.getElementById('alertText');
+            if (show) {
+                alertBox.style.display = 'flex';
+                alertText.textContent = message;
+            } else {
+                alertBox.style.display = 'none';
+            }
+        }
+        
+        function mergeData() {
+            mergedData = [];
+            const incomingMap = buildIncomingMap();
+            
+            if (inventoryData.inventory && inventoryData.inventory.length > 0) {
+                const salesMap = {};
+                if (salesData && salesData.detailed) {
+                    salesData.detailed.forEach(item => {
+                        const key = `${item.type}|${item.color}|${item.size}`;
+                        salesMap[key] = item;
+                    });
+                }
+                
+                const daysSinceStart = salesData.daysSinceStart || 1;
+                
+                // Track which incoming items are already in inventory
+                const seenKeys = new Set();
+                
+                inventoryData.inventory.forEach(inv => {
+                    const key = `${inv.type}|${inv.color}|${inv.size}`;
+                    seenKeys.add(key);
+                    const sales = salesMap[key];
+                    const incomingQty = incomingMap[key] || 0;
+                    
+                    let totalSales = sales ? sales.count : 0;
+                    let todaySales = sales ? (sales.today || 0) : 0;
+                    let yesterdaySales = sales ? (sales.yesterday || 0) : 0;
+                    let weekSales = sales ? (sales.week || 0) : 0;
+                    
+                    let currentStock = inv.stock; // Already calculated (initial - sales), can be negative
+                    let dailySales = weekSales > 0 ? weekSales / 7 : (daysSinceStart > 0 ? totalSales / daysSinceStart : 0);
+                    
+                    // Calculate stock based on current view
+                    let displayStock;
+                    if (currentView === 'current') {
+                        displayStock = currentStock;
+                    } else if (currentView === 'incoming') {
+                        displayStock = incomingQty;
+                    } else { // 'total'
+                        displayStock = currentStock + incomingQty;
+                    }
+                    
+                    let daysOfStock = dailySales > 0 ? Math.round(displayStock / dailySales) : Infinity;
+                    
+                    mergedData.push({
+                        sku: inv.sku || `${inv.type}-${inv.color}-${inv.size}`,
+                        type: inv.type,
+                        color: inv.color,
+                        size: inv.size,
+                        startingStock: inv.stock,
+                        todaySales: todaySales,
+                        yesterdaySales: yesterdaySales,
+                        weekSales: weekSales,
+                        totalSales: totalSales,
+                        currentStock: currentStock,
+                        incomingStock: incomingQty,
+                        stock: displayStock,
+                        dailySales: dailySales,
+                        daysOfStock: daysOfStock
+                    });
+                });
+                
+                // Add incoming items that aren't in current inventory (incoming view only)
+                if (currentView === 'incoming' || currentView === 'total') {
+                    Object.entries(incomingMap).forEach(([key, qty]) => {
+                        if (!seenKeys.has(key)) {
+                            const [type, color, size] = key.split('|');
+                            mergedData.push({
+                                sku: `${type}-${color}-${size}`,
+                                type,
+                                color,
+                                size,
+                                startingStock: 0,
+                                todaySales: 0,
+                                yesterdaySales: 0,
+                                weekSales: 0,
+                                totalSales: 0,
+                                currentStock: 0,
+                                incomingStock: qty,
+                                stock: qty,
+                                dailySales: 0,
+                                daysOfStock: Infinity
+                            });
+                        }
+                    });
+                }
+            } else {
+                showAlert(true, 'No inventory data. Run fetch-inventory.js first.');
+            }
+        }
+        
+        function populateFilters() {
+            const colors = [...new Set(mergedData.map(i => i.color).filter(Boolean))].sort();
+            const colorSelect = document.getElementById('colorFilter');
+            colorSelect.innerHTML = '<option value="">All Colors</option>';
+            colors.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = c;
+                colorSelect.appendChild(opt);
+            });
+            
+            const sizes = [...new Set(mergedData.map(i => i.size).filter(Boolean))]
+                .sort((a, b) => SIZE_ORDER.indexOf(a) - SIZE_ORDER.indexOf(b));
+            const sizeSelect = document.getElementById('sizeFilter');
+            sizeSelect.innerHTML = '<option value="">All Sizes</option>';
+            sizes.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s;
+                opt.textContent = s;
+                sizeSelect.appendChild(opt);
+            });
+        }
+        
+        function applyFilters() {
+            const typeFilter = document.getElementById('typeFilter').value;
+            const colorFilter = document.getElementById('colorFilter').value;
+            const sizeFilter = document.getElementById('sizeFilter').value;
+            const stockFilter = document.getElementById('stockFilter').value;
+            
+            filteredData = mergedData.filter(item => {
+                if (typeFilter && item.type !== typeFilter) return false;
+                if (colorFilter && item.color !== colorFilter) return false;
+                if (sizeFilter && item.size !== sizeFilter) return false;
+                
+                if (stockFilter === 'critical' && item.daysOfStock >= 7) return false;
+                if (stockFilter === 'low' && (item.daysOfStock < 7 || item.daysOfStock >= 14)) return false;
+                if (stockFilter === 'ok' && item.daysOfStock < 14) return false;
+                
+                return true;
+            });
+            
+            updateSummary();
+            updateCharts();
+            updateTable();
+        }
+        
+        // Product costs in EUR
+        const COSTS = { 'T-Shirt': 3.50, 'Boxers': 2.25, 'Socks': 0.80 };
+        
+        function updateSummary() {
+            // Stock quantities by type
+            const tshirtStock = filteredData.filter(i => i.type === 'T-Shirt').reduce((sum, i) => sum + i.stock, 0);
+            const boxerStock = filteredData.filter(i => i.type === 'Boxers').reduce((sum, i) => sum + i.stock, 0);
+            const sockStock = filteredData.filter(i => i.type === 'Socks').reduce((sum, i) => sum + i.stock, 0);
+            const totalStock = tshirtStock + boxerStock + sockStock;
+            
+            // Stock values in EUR
+            const tshirtValue = tshirtStock * COSTS['T-Shirt'];
+            const boxerValue = boxerStock * COSTS['Boxers'];
+            const sockValue = sockStock * COSTS['Socks'];
+            const totalValue = tshirtValue + boxerValue + sockValue;
+            
+            // Alert counts
+            const lowStock = filteredData.filter(i => i.daysOfStock < 14 && i.daysOfStock >= 7).length;
+            const criticalStock = filteredData.filter(i => i.daysOfStock < 7).length;
+            
+            // Update quantity cards
+            document.getElementById('totalStock').textContent = totalStock.toLocaleString();
+            document.getElementById('tshirtStock').textContent = tshirtStock.toLocaleString();
+            document.getElementById('boxerStock').textContent = boxerStock.toLocaleString();
+            document.getElementById('sockStock').textContent = sockStock.toLocaleString();
+            
+            // Update value cards
+            document.getElementById('totalValue').textContent = '€' + totalValue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0});
+            document.getElementById('tshirtValue').textContent = '€' + tshirtValue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0});
+            document.getElementById('boxerValue').textContent = '€' + boxerValue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0});
+            document.getElementById('sockValue').textContent = '€' + sockValue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0});
+            
+            // Update alert cards
+            document.getElementById('lowStockCount').textContent = lowStock;
+            document.getElementById('criticalStockCount').textContent = criticalStock;
+        }
+        
+        function updateCharts() {
+            const byType = {};
+            filteredData.forEach(item => {
+                byType[item.type] = (byType[item.type] || 0) + item.stock;
+            });
+            
+            if (typeChart) typeChart.destroy();
+            typeChart = new Chart(document.getElementById('typeChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(byType),
+                    datasets: [{
+                        data: Object.values(byType),
+                        backgroundColor: ['#3b82f6', '#ef4444', '#f59e0b'],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: { color: '#64748b', font: { family: 'Inter' } }
+                        }
+                    }
+                }
+            });
+            
+            const daysDistribution = {
+                'Critical (0-6)': filteredData.filter(i => i.daysOfStock < 7).length,
+                'Low (7-13)': filteredData.filter(i => i.daysOfStock >= 7 && i.daysOfStock < 14).length,
+                'OK (14-30)': filteredData.filter(i => i.daysOfStock >= 14 && i.daysOfStock <= 30).length,
+                'Good (30+)': filteredData.filter(i => i.daysOfStock > 30 && i.daysOfStock !== Infinity).length,
+                'No sales': filteredData.filter(i => i.daysOfStock === Infinity).length
+            };
+            
+            if (daysChart) daysChart.destroy();
+            daysChart = new Chart(document.getElementById('daysChart'), {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(daysDistribution),
+                    datasets: [{
+                        label: 'SKUs',
+                        data: Object.values(daysDistribution),
+                        backgroundColor: ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#94a3b8'],
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#e5e7eb' },
+                            ticks: { color: '#64748b', font: { family: 'Inter' } }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#64748b', font: { family: 'Inter' } }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function updateTable() {
+            const sorted = [...filteredData].sort((a, b) => {
+                let aVal = a[sortColumn];
+                let bVal = b[sortColumn];
+                
+                if (aVal === Infinity) aVal = 999999;
+                if (bVal === Infinity) bVal = 999999;
+                
+                if (sortColumn === 'size') {
+                    aVal = SIZE_ORDER.indexOf(a.size);
+                    bVal = SIZE_ORDER.indexOf(b.size);
+                }
+                
+                if (sortColumn === 'days') {
+                    aVal = a.daysOfStock === Infinity ? 999999 : a.daysOfStock;
+                    bVal = b.daysOfStock === Infinity ? 999999 : b.daysOfStock;
+                }
+                
+                if (sortColumn === 'today') {
+                    aVal = a.todaySales || 0;
+                    bVal = b.todaySales || 0;
+                }
+                
+                if (sortColumn === 'yesterday') {
+                    aVal = a.yesterdaySales || 0;
+                    bVal = b.yesterdaySales || 0;
+                }
+                
+                if (sortColumn === 'week') {
+                    aVal = a.weekSales || 0;
+                    bVal = b.weekSales || 0;
+                }
+                
+                if (typeof aVal === 'string') {
+                    return sortDirection === 'asc' 
+                        ? aVal.localeCompare(bVal)
+                        : bVal.localeCompare(aVal);
+                }
+                return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+            });
+            
+            document.querySelectorAll('th[data-sort]').forEach(th => {
+                th.classList.remove('sorted-asc', 'sorted-desc');
+                if (th.dataset.sort === sortColumn) {
+                    th.classList.add(sortDirection === 'asc' ? 'sorted-asc' : 'sorted-desc');
+                }
+            });
+            
+            const tbody = document.getElementById('stockTableBody');
+            tbody.innerHTML = sorted.map(row => {
+                let rowClass = '';
+                if (row.daysOfStock < 7) rowClass = 'low-stock';
+                else if (row.daysOfStock < 14) rowClass = 'warning-stock';
+                
+                let stockClass = 'stock-ok';
+                if (row.stock < 0) stockClass = 'stock-negative';
+                else if (row.stock === 0) stockClass = 'stock-zero';
+                else if (row.daysOfStock < 14) stockClass = 'stock-low';
+                
+                let daysBadge = 'days-ok';
+                let daysText = row.daysOfStock;
+                if (row.daysOfStock === Infinity) {
+                    daysBadge = 'days-infinite';
+                    daysText = '∞';
+                } else if (row.daysOfStock < 7) {
+                    daysBadge = 'days-danger';
+                } else if (row.daysOfStock < 14) {
+                    daysBadge = 'days-warning';
+                }
+                
+                // Generate sparkline data (simulated 7-day trend based on available data)
+                const sparklineData = generateSparkline(row);
+                const trendClass = getTrendClass(sparklineData);
+                const sparklineSvg = createSparklineSvg(sparklineData);
+                
+                return `
+                    <tr class="${rowClass}">
+                        <td>${row.sku}</td>
+                        <td><span class="type-badge type-${(row.type || '').replace(/\s/g, '-')}">${row.type || '-'}</span></td>
+                        <td><span class="color-badge color-${row.color || ''}">${row.color || '-'}</span></td>
+                        <td style="font-weight: 600; font-family: monospace;">${row.size || '-'}</td>
+                        <td class="sales-value">${row.todaySales || 0}</td>
+                        <td class="sales-value">${row.yesterdaySales || 0}</td>
+                        <td class="sales-value">${row.totalSales} <small style="color:#94a3b8">(${row.dailySales.toFixed(1)}/d)</small></td>
+                        <td class="sparkline-cell">
+                            <span class="sparkline ${trendClass}" data-sku="${row.sku}" data-trend="${JSON.stringify(sparklineData).replace(/"/g, '&quot;')}" onclick="showTrendPopup(event, this)">
+                                ${sparklineSvg}
+                            </span>
+                        </td>
+                        <td class="stock-value ${stockClass}">${row.stock} <button class="edit-btn" onclick="editStock('${row.sku}', ${row.stock})" title="Uredi zalogo">✏️</button></td>
+                        <td style="color: var(--primary); font-weight: 600;">${row.incomingStock > 0 ? row.incomingStock.toLocaleString() : '-'}</td>
+                        <td><span class="days-badge ${daysBadge}">${daysText}</span></td>
+                    </tr>
+                `;
+            }).join('');
+            
+            // Calculate and display totals for Today and Yesterday
+            const totalToday = sorted.reduce((sum, row) => sum + (row.todaySales || 0), 0);
+            const totalYesterday = sorted.reduce((sum, row) => sum + (row.yesterdaySales || 0), 0);
+            document.getElementById('totalToday').textContent = totalToday;
+            document.getElementById('totalYesterday').textContent = totalYesterday;
+        }
+        
+        document.querySelectorAll('.filters-card select').forEach(el => {
+            el.addEventListener('change', applyFilters);
+        });
+        
+        document.querySelectorAll('th[data-sort]').forEach(th => {
+            th.addEventListener('click', () => {
+                const col = th.dataset.sort;
+                if (sortColumn === col) {
+                    sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+                } else {
+                    sortColumn = col;
+                    sortDirection = col === 'days' || col === 'stock' ? 'asc' : 'desc';
+                }
+                updateTable();
+            });
+        });
+        
+        // Generate sparkline data from row sales info
+        function generateSparkline(row) {
+            // We have: today, yesterday, week (7 days total)
+            // Approximate daily values for sparkline
+            const today = row.todaySales || 0;
+            const yesterday = row.yesterdaySales || 0;
+            const weekTotal = row.weekSales || 0;
+            const weekAvg = weekTotal / 7;
+            
+            // Generate approximate 7-day trend
+            // Days: -6, -5, -4, -3, -2, -1 (yesterday), 0 (today)
+            const remaining = Math.max(0, weekTotal - today - yesterday);
+            const avgOther = remaining / 5;
+            
+            return [
+                Math.round(avgOther * 0.8),
+                Math.round(avgOther * 0.9),
+                Math.round(avgOther),
+                Math.round(avgOther * 1.1),
+                Math.round(avgOther * 1.0),
+                yesterday,
+                today
+            ];
+        }
+        
+        // Determine trend direction
+        function getTrendClass(data) {
+            if (data.length < 2) return 'flat';
+            const recent = data.slice(-3).reduce((a, b) => a + b, 0);
+            const older = data.slice(0, 3).reduce((a, b) => a + b, 0);
+            if (recent > older * 1.1) return 'up';
+            if (recent < older * 0.9) return 'down';
+            return 'flat';
+        }
+        
+        // Create SVG sparkline
+        function createSparklineSvg(data) {
+            if (!data || data.length === 0) return '<svg></svg>';
+            const max = Math.max(...data, 1);
+            const width = 60, height = 20;
+            const step = width / (data.length - 1);
+            
+            const points = data.map((v, i) => {
+                const x = i * step;
+                const y = height - (v / max) * (height - 4) - 2;
+                return `${x},${y}`;
+            }).join(' ');
+            
+            return `<svg viewBox="0 0 ${width} ${height}"><path d="M${points.replace(/ /g, ' L')}"></path></svg>`;
+        }
+        
+        // Trend popup
+        let trendPopup = null;
+        let trendOverlay = null;
+        let trendChart = null;
+        
+        function closeTrendPopup() {
+            if (trendPopup) trendPopup.classList.remove('visible');
+            if (trendOverlay) trendOverlay.classList.remove('visible');
+        }
+        
+        function showTrendPopup(event, element) {
+            event.stopPropagation();
+            const sku = element.dataset.sku;
+            const trendData = JSON.parse(element.dataset.trend);
+            
+            if (!trendOverlay) {
+                trendOverlay = document.createElement('div');
+                trendOverlay.className = 'trend-popup-overlay';
+                trendOverlay.onclick = closeTrendPopup;
+                document.body.appendChild(trendOverlay);
+            }
+            
+            if (!trendPopup) {
+                trendPopup = document.createElement('div');
+                trendPopup.className = 'trend-popup';
+                trendPopup.innerHTML = `
+                    <h4 id="trendTitle">Trend</h4>
+                    <div class="chart-container">
+                        <canvas id="trendChartCanvas"></canvas>
+                    </div>
+                    <div class="trend-stats">
+                        <div class="trend-stat"><div class="label">Danes</div><div class="value" id="trendToday">-</div></div>
+                        <div class="trend-stat"><div class="label">Včeraj</div><div class="value" id="trendYesterday">-</div></div>
+                        <div class="trend-stat"><div class="label">7 dni</div><div class="value" id="trend7d">-</div></div>
+                        <div class="trend-stat"><div class="label">Povp/dan</div><div class="value" id="trendAvg">-</div></div>
+                    </div>
+                `;
+                document.body.appendChild(trendPopup);
+                trendPopup.onclick = (e) => e.stopPropagation();
+            }
+            
+            // Position popup - centered on screen
+            trendPopup.style.left = '50%';
+            trendPopup.style.top = '50%';
+            trendPopup.style.transform = 'translate(-50%, -50%)';
+            
+            // Update content
+            document.getElementById('trendTitle').textContent = `📈 ${sku} - Prodaja`;
+            document.getElementById('trendToday').textContent = trendData[6] || 0;
+            document.getElementById('trendYesterday').textContent = trendData[5] || 0;
+            const total7d = trendData.reduce((a, b) => a + b, 0);
+            document.getElementById('trend7d').textContent = total7d;
+            document.getElementById('trendAvg').textContent = (total7d / 7).toFixed(1);
+            
+            // Create/update chart - use bar chart for better visibility
+            if (trendChart) trendChart.destroy();
+            const ctx = document.getElementById('trendChartCanvas').getContext('2d');
+            trendChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['-6d', '-5d', '-4d', '-3d', '-2d', 'Včeraj', 'Danes'],
+                    datasets: [{
+                        data: trendData,
+                        backgroundColor: trendData.map((v, i) => 
+                            i === 6 ? '#3b82f6' :  // Today - blue
+                            i === 5 ? '#60a5fa' :  // Yesterday - lighter blue
+                            '#94a3b8'              // Older days - gray
+                        ),
+                        borderRadius: 4,
+                        barPercentage: 0.7
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { 
+                            beginAtZero: true, 
+                            grid: { color: '#e5e7eb' },
+                            ticks: { stepSize: 1 }
+                        },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+            
+            trendOverlay.classList.add('visible');
+            trendPopup.classList.add('visible');
+        }
+        
+        loadData();
+        
+        // Edit Stock Modal
+        let editingSku = null;
+        
+        function editStock(sku, currentValue) {
+            editingSku = sku;
+            document.getElementById('edit-sku').textContent = sku;
+            document.getElementById('edit-stock-input').value = currentValue;
+            document.getElementById('edit-overlay').classList.add('visible');
+            document.getElementById('edit-modal').classList.add('visible');
+            document.getElementById('edit-stock-input').focus();
+            document.getElementById('edit-stock-input').select();
+        }
+        
+        function closeEditModal() {
+            document.getElementById('edit-overlay').classList.remove('visible');
+            document.getElementById('edit-modal').classList.remove('visible');
+            editingSku = null;
+        }
+        
+        async function saveStock() {
+            const newValue = parseInt(document.getElementById('edit-stock-input').value);
+            if (isNaN(newValue)) {
+                alert('Vnesi veljavno število!');
+                return;
+            }
+            
+            try {
+                const res = await fetch('/dashboard/api/inventory/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sku: editingSku, stock: newValue })
+                });
+                const data = await res.json();
+                
+                if (data.ok) {
+                    closeEditModal();
+                    loadData(); // Refresh table
+                } else {
+                    alert('Napaka: ' + (data.error || 'Unknown error'));
+                }
+            } catch (e) {
+                alert('Napaka: ' + e.message);
+            }
+        }
+        
+        // Handle Enter key in edit input
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && editingSku) {
+                saveStock();
+            } else if (e.key === 'Escape' && editingSku) {
+                closeEditModal();
+            }
+        });
+    </script>
+    
+    <!-- Edit Stock Modal -->
+    <div id="edit-overlay" class="trend-popup-overlay" onclick="closeEditModal()"></div>
+    <div id="edit-modal" class="edit-modal">
+        <h3>✏️ Uredi zalogo</h3>
+        <p style="margin: 0 0 12px 0; color: var(--text-secondary);"><strong id="edit-sku">-</strong></p>
+        <input type="number" id="edit-stock-input" placeholder="Nova zaloga">
+        <div class="btn-row">
+            <button class="btn-cancel" onclick="closeEditModal()">Prekliči</button>
+            <button class="btn-save" onclick="saveStock()">💾 Shrani</button>
+        </div>
+    </div>
+    
+<script src="/dashboard/sidebar.js"></script>
+    <script>renderSidebar('stock-report');</script>
+</body>
+</html>

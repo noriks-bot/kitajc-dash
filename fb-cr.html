@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FB Conversion Rate - Noriks Analytics</title>
+    <link rel="stylesheet" href="/dashboard/styles.css?v=20260319">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <style>
+        .cr-funnel { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin: 16px 0; }
+        .funnel-step { background: var(--content-bg); border-radius: 8px; padding: 14px 10px; text-align: center; position: relative; }
+        .funnel-step::after { content: '→'; position: absolute; right: -12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 16px; }
+        .funnel-step:last-child::after { display: none; }
+        .funnel-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 4px; }
+        .funnel-value { font-size: 18px; font-weight: 700; color: var(--text-primary); }
+        .funnel-pct { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+        .funnel-cr { font-size: 13px; font-weight: 700; margin-top: 4px; }
+
+        .chart-container { position: relative; height: 350px; margin: 20px 0; }
+        .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+        @media (max-width: 768px) { .chart-row { grid-template-columns: 1fr; } }
+
+        .cr-table th { text-align: right; }
+        .cr-table th:first-child, .cr-table td:first-child { text-align: left; }
+        .cr-table td { text-align: right; font-variant-numeric: tabular-nums; }
+        .cr-table td:first-child { text-align: left; font-weight: 500; }
+        .cr-highlight { background: rgba(59,130,246,0.08); }
+    </style>
+</head>
+<body>
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <aside class="sidebar"></aside>
+
+    <main class="main">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+                <h1 class="page-title">📈 FB Conversion Rate Report</h1>
+            </div>
+            <div class="topbar-right">
+                <div class="status-badge">
+                    <span class="status-dot"></span>
+                    <span id="lastUpdated">Loading...</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="content">
+            <div class="data-info-banner">
+                <div class="info-left">
+                    <span class="info-icon">📈</span>
+                    <div class="info-text">
+                        <strong>Data Source:</strong> Meta Ads API (Insights)
+                        <span class="info-sep">•</span>
+                        <strong>Period:</strong> <span id="dataRange">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="filters-section">
+                <div class="filters-left">
+                    <div class="filter-group">
+                        <span class="filter-label">Period</span>
+                        <div class="preset-tabs">
+                            <button class="preset-tab" onclick="setDay('today')" id="btn-today">Today</button>
+                            <button class="preset-tab" onclick="setDay('yesterday')" id="btn-yesterday">Yesterday</button>
+                            <button class="preset-tab" onclick="setPreset(7)" id="btn-7d">7D</button>
+                            <button class="preset-tab" onclick="setPreset(14)" id="btn-14d">14D</button>
+                            <button class="preset-tab" onclick="setPreset(30)" id="btn-30d">30D</button>
+                            <button class="preset-tab" onclick="setMonth('current')" id="btn-month">This Month</button>
+                            <button class="preset-tab" onclick="setMonth('last')" id="btn-lastmonth">Last Month</button>
+                            <button class="preset-tab" onclick="setYear()" id="btn-year">2026</button>
+                        </div>
+                    </div>
+                    <div class="filter-group">
+                        <span class="filter-label">Range</span>
+                        <div class="date-range">
+                            <input type="date" id="startDate" class="date-input">
+                            <span class="date-sep">→</span>
+                            <input type="date" id="endDate" class="date-input">
+                        </div>
+                    </div>
+                </div>
+                <button id="loadBtn" class="btn btn-primary" onclick="loadData()">Apply</button>
+            </div>
+
+            <div id="error" class="error" style="display:none;"><span>⚠️</span><span id="errorText"></span></div>
+            <div id="loading" style="display:none;"></div>
+
+            <!-- Main CR chart — ALL countries, daily line chart -->
+            <div class="table-card" id="mainChartCard" style="display:none;">
+                <div class="table-header"><div class="table-title"><span style="font-size:16px;">📈</span> Conversion Rate — All Countries (daily)</div></div>
+                <div style="padding:16px;"><div style="position:relative;height:400px;"><canvas id="chartMainCR"></canvas></div></div>
+            </div>
+
+            <!-- Funnel -->
+            <div id="funnelSection" style="display:none;">
+                <div class="cr-funnel" id="funnel"></div>
+            </div>
+
+            <!-- Top metrics -->
+            <div class="metrics-grid" id="metricsGrid" style="display:none;">
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">👁️</div></div>
+                    <div class="metric-label">Impressions</div>
+                    <div class="metric-value" id="mImpressions">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">🔗</div></div>
+                    <div class="metric-label">Link Clicks</div>
+                    <div class="metric-value" id="mClicks">—</div>
+                    <div class="metric-sub" id="mCTR"></div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">🛒</div></div>
+                    <div class="metric-label">Purchases</div>
+                    <div class="metric-value text-green" id="mPurchases">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">📈</div></div>
+                    <div class="metric-label">CR (Clicks → Purchase)</div>
+                    <div class="metric-value text-primary" id="mCR">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">💰</div></div>
+                    <div class="metric-label">CPA</div>
+                    <div class="metric-value text-amber" id="mCPA">—</div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div id="chartsSection" style="display:none;">
+                <div class="chart-row">
+                    <div class="table-card">
+                        <div class="table-header"><div class="table-title"><span style="font-size:16px;">📈</span> Daily CR % (Clicks → Purchase)</div></div>
+                        <div style="padding:16px;"><div class="chart-container"><canvas id="chartCR"></canvas></div></div>
+                    </div>
+                    <div class="table-card">
+                        <div class="table-header"><div class="table-title"><span style="font-size:16px;">🔗</span> Daily Link Clicks</div></div>
+                        <div style="padding:16px;"><div class="chart-container"><canvas id="chartClicks"></canvas></div></div>
+                    </div>
+                </div>
+                <div class="chart-row">
+                    <div class="table-card">
+                        <div class="table-header"><div class="table-title"><span style="font-size:16px;">🛒</span> Daily Purchases</div></div>
+                        <div style="padding:16px;"><div class="chart-container"><canvas id="chartPurchases"></canvas></div></div>
+                    </div>
+                    <div class="table-card">
+                        <div class="table-header"><div class="table-title"><span style="font-size:16px;">💰</span> Daily CPA (€)</div></div>
+                        <div style="padding:16px;"><div class="chart-container"><canvas id="chartCPA"></canvas></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Country cards -->
+            <div class="country-summary" id="countryCards" style="display:none;"></div>
+
+            <!-- Daily table -->
+            <div class="table-card" id="dailyTableCard" style="display:none;">
+                <div class="table-header">
+                    <div class="table-title"><span style="font-size:16px;">📅</span> Daily Breakdown (All Countries)</div>
+                </div>
+                <div class="table-scroll">
+                    <table class="cr-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left">Date</th>
+                                <th>Impressions</th>
+                                <th>Link Clicks</th>
+                                <th>CTR %</th>
+                                <th>LPV</th>
+                                <th>View Content</th>
+                                <th>ATC</th>
+                                <th>IC</th>
+                                <th>Purchases</th>
+                                <th>CR %</th>
+                                <th>Spend €</th>
+                                <th>CPA €</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dailyBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/dashboard/sidebar.js"></script>
+    <script>
+        renderSidebar('fb-cr');
+
+        const FLAGS = { HR: '🇭🇷', CZ: '🇨🇿', PL: '🇵🇱', GR: '🇬🇷', IT: '🇮🇹', HU: '🇭🇺', SK: '🇸🇰' };
+        const COLORS = { HR: '#3b82f6', CZ: '#ef4444', PL: '#f59e0b', GR: '#10b981', IT: '#8b5cf6', HU: '#ec4899', SK: '#06b6d4' };
+        const COUNTRIES = ['HR', 'CZ', 'PL', 'GR', 'IT', 'HU', 'SK'];
+
+        let charts = {};
+
+        function fmt(n) { return n.toLocaleString('de-DE'); }
+        function fmtE(n) { return '€' + n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+        function fmtPct(n) { return n.toFixed(2) + '%'; }
+        function crColor(cr) { return cr >= 4 ? 'var(--success)' : cr >= 2.5 ? 'var(--warning)' : 'var(--danger)'; }
+
+        function toISO(d) { return d.toISOString().split('T')[0]; }
+        function highlightBtn(id) {
+            document.querySelectorAll('.preset-tab').forEach(t => t.classList.remove('active'));
+            if (id) document.getElementById(id)?.classList.add('active');
+        }
+        function setDay(which) {
+            const now = new Date();
+            if (which === 'today') {
+                document.getElementById('startDate').value = toISO(now);
+                document.getElementById('endDate').value = toISO(now);
+                highlightBtn('btn-today');
+            } else {
+                const y = new Date(now); y.setDate(y.getDate() - 1);
+                document.getElementById('startDate').value = toISO(y);
+                document.getElementById('endDate').value = toISO(y);
+                highlightBtn('btn-yesterday');
+            }
+            loadData();
+        }
+        function setPreset(days) {
+            const end = new Date();
+            const start = new Date(); start.setDate(start.getDate() - days);
+            document.getElementById('startDate').value = toISO(start);
+            document.getElementById('endDate').value = toISO(end);
+            highlightBtn('btn-' + days + 'd');
+            loadData();
+        }
+        function setMonth(which) {
+            const now = new Date();
+            if (which === 'current') {
+                const start = new Date(now.getFullYear(), now.getMonth(), 1);
+                document.getElementById('startDate').value = toISO(start);
+                document.getElementById('endDate').value = toISO(now);
+                highlightBtn('btn-month');
+            } else {
+                const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                const end = new Date(now.getFullYear(), now.getMonth(), 0);
+                document.getElementById('startDate').value = toISO(start);
+                document.getElementById('endDate').value = toISO(end);
+                highlightBtn('btn-lastmonth');
+            }
+            loadData();
+        }
+        function setYear() {
+            document.getElementById('startDate').value = '2026-01-01';
+            document.getElementById('endDate').value = toISO(new Date());
+            highlightBtn('btn-year');
+            loadData();
+        }
+
+        // Default: 7 days
+        (function() {
+            const end = new Date();
+            const start = new Date(); start.setDate(start.getDate() - 7);
+            document.getElementById('startDate').value = toISO(start);
+            document.getElementById('endDate').value = toISO(end);
+            document.getElementById('btn-7d').classList.add('active');
+        })();
+
+        async function loadData() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            if (!start || !end) return;
+
+            document.getElementById('loading').style.display = 'flex';
+            document.getElementById('error').style.display = 'none';
+            ['mainChartCard', 'funnelSection', 'metricsGrid', 'chartsSection', 'countryCards', 'dailyTableCard'].forEach(id => document.getElementById(id).style.display = 'none');
+
+            try {
+                const resp = await fetch(`/dashboard/api/fb-cr?start=${start}&end=${end}`);
+                if (!resp.ok) throw new Error('API error: ' + resp.status);
+                const data = await resp.json();
+                if (data.error) throw new Error(data.error);
+                renderData(data);
+            } catch (e) {
+                document.getElementById('error').style.display = 'flex';
+                document.getElementById('errorText').textContent = e.message;
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function renderData(data) {
+            const t = data.totals;
+            document.getElementById('dataRange').textContent = `${data.start} → ${data.end}`;
+            document.getElementById('lastUpdated').textContent = data.generatedAt ? new Date(data.generatedAt).toLocaleTimeString() : 'Just now';
+
+            // Funnel
+            const funnel = document.getElementById('funnel');
+            const steps = [
+                { label: 'Impressions', value: t.impressions, pct: null },
+                { label: 'Link Clicks', value: t.link_clicks, pct: t.ctr },
+                { label: 'Landing Page Views', value: t.landing_page_views, pct: t.link_clicks > 0 ? (t.landing_page_views / t.link_clicks * 100) : 0 },
+                { label: 'View Content', value: t.view_content, pct: t.landing_page_views > 0 ? (t.view_content / t.landing_page_views * 100) : 0 },
+                { label: 'Add to Cart', value: t.add_to_cart, pct: t.view_content > 0 ? (t.add_to_cart / t.view_content * 100) : 0 },
+                { label: 'Checkout', value: t.initiate_checkout, pct: t.add_to_cart > 0 ? (t.initiate_checkout / t.add_to_cart * 100) : 0 },
+                { label: 'Purchase', value: t.purchases, pct: t.initiate_checkout > 0 ? (t.purchases / t.initiate_checkout * 100) : 0 }
+            ];
+            funnel.innerHTML = steps.map(s => `
+                <div class="funnel-step">
+                    <div class="funnel-label">${s.label}</div>
+                    <div class="funnel-value">${fmt(s.value)}</div>
+                    ${s.pct !== null ? `<div class="funnel-pct">${s.pct.toFixed(1)}% from prev</div>` : ''}
+                </div>
+            `).join('');
+            document.getElementById('funnelSection').style.display = 'block';
+
+            // Metrics
+            document.getElementById('mImpressions').textContent = fmt(t.impressions);
+            document.getElementById('mClicks').textContent = fmt(t.link_clicks);
+            document.getElementById('mCTR').textContent = 'CTR: ' + fmtPct(t.ctr);
+            document.getElementById('mPurchases').textContent = fmt(t.purchases);
+            document.getElementById('mCR').textContent = fmtPct(t.cr_click);
+            document.getElementById('mCR').style.color = crColor(t.cr_click);
+            document.getElementById('mCPA').textContent = t.cpa !== null ? fmtE(t.cpa) : '—';
+            document.getElementById('metricsGrid').style.display = 'grid';
+
+            // Main CR chart (top)
+            renderMainCRChart(data);
+            document.getElementById('mainChartCard').style.display = 'block';
+
+            // Charts
+            renderCharts(data);
+            document.getElementById('chartsSection').style.display = 'block';
+
+            // Country cards
+            renderCountryCards(data);
+            document.getElementById('countryCards').style.display = 'grid';
+
+            // Daily table
+            renderDailyTable(data);
+            document.getElementById('dailyTableCard').style.display = 'block';
+        }
+
+        let mainCRChart = null;
+        function renderMainCRChart(data) {
+            if (mainCRChart) mainCRChart.destroy();
+            const dates = data.dates;
+            const labels = dates.map(d => { const p = d.split('-'); return p[2] + '.' + p[1]; }); // DD.MM
+
+            // Per-country CR lines + bold white TOTAL dashed line
+            const dailyTotals = dates.map(date => {
+                const agg = { link_clicks: 0, purchases: 0 };
+                for (const c of COUNTRIES) {
+                    const d = data.daily[date]?.[c];
+                    if (d) { agg.link_clicks += d.link_clicks; agg.purchases += d.purchases; }
+                }
+                return agg;
+            });
+
+            const datasets = COUNTRIES.map(c => ({
+                label: c,
+                data: dates.map(date => {
+                    const d = data.daily[date]?.[c];
+                    return d && d.link_clicks > 0 ? Math.round(d.purchases / d.link_clicks * 10000) / 100 : null;
+                }),
+                borderColor: COLORS[c],
+                backgroundColor: COLORS[c] + '22',
+                borderWidth: 2,
+                pointRadius: dates.length > 45 ? 0 : 3,
+                pointHoverRadius: 5,
+                tension: 0.3,
+                spanGaps: true
+            }));
+
+            datasets.push({
+                label: 'TOTAL',
+                data: dailyTotals.map(d => d.link_clicks > 0 ? Math.round(d.purchases / d.link_clicks * 10000) / 100 : null),
+                borderColor: '#ffffff',
+                borderWidth: 3,
+                borderDash: [8, 4],
+                pointRadius: 0,
+                tension: 0.3,
+                spanGaps: true
+            });
+
+            mainCRChart = new Chart(document.getElementById('chartMainCR'), {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: true, position: 'top', labels: { boxWidth: 12, font: { size: 11 }, usePointStyle: true, padding: 16 } },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ctx.dataset.label + ': ' + (ctx.parsed.y !== null ? ctx.parsed.y.toFixed(2) + '%' : '—')
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } },
+                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { callback: v => v + '%', font: { size: 11 } } }
+                    }
+                }
+            });
+        }
+
+        function renderCharts(data) {
+            // Destroy existing
+            Object.values(charts).forEach(c => c.destroy());
+            charts = {};
+
+            const dates = data.dates;
+            const labels = dates.map(d => d.substring(5)); // MM-DD
+
+            // Aggregate daily totals across countries
+            const dailyTotals = dates.map(date => {
+                const agg = { link_clicks: 0, purchases: 0, spend: 0 };
+                for (const c of COUNTRIES) {
+                    const d = data.daily[date]?.[c];
+                    if (d) { agg.link_clicks += d.link_clicks; agg.purchases += d.purchases; agg.spend += d.spend; }
+                }
+                return agg;
+            });
+
+            const commonOpts = {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: true, position: 'top', labels: { boxWidth: 10, font: { size: 10 } } } },
+                scales: { x: { grid: { display: false }, ticks: { font: { size: 9 }, maxRotation: 45 } }, y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } } }
+            };
+
+            // CR chart — per country lines
+            charts.cr = new Chart(document.getElementById('chartCR'), {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: COUNTRIES.map(c => ({
+                        label: c,
+                        data: dates.map(date => {
+                            const d = data.daily[date]?.[c];
+                            return d && d.link_clicks > 0 ? Math.round(d.purchases / d.link_clicks * 10000) / 100 : null;
+                        }),
+                        borderColor: COLORS[c],
+                        backgroundColor: COLORS[c] + '33',
+                        borderWidth: 2,
+                        pointRadius: dates.length > 30 ? 0 : 3,
+                        tension: 0.3,
+                        spanGaps: true
+                    })).concat([{
+                        label: 'TOTAL',
+                        data: dailyTotals.map(d => d.link_clicks > 0 ? Math.round(d.purchases / d.link_clicks * 10000) / 100 : null),
+                        borderColor: '#fff',
+                        borderWidth: 3,
+                        borderDash: [6, 3],
+                        pointRadius: 0,
+                        tension: 0.3,
+                        spanGaps: true
+                    }])
+                },
+                options: { ...commonOpts, scales: { ...commonOpts.scales, y: { ...commonOpts.scales.y, ticks: { callback: v => v + '%' } } } }
+            });
+
+            // Clicks chart — stacked bar per country
+            charts.clicks = new Chart(document.getElementById('chartClicks'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: COUNTRIES.map(c => ({
+                        label: c,
+                        data: dates.map(date => data.daily[date]?.[c]?.link_clicks || 0),
+                        backgroundColor: COLORS[c] + 'cc',
+                        borderRadius: 2
+                    }))
+                },
+                options: { ...commonOpts, scales: { ...commonOpts.scales, x: { ...commonOpts.scales.x, stacked: true }, y: { ...commonOpts.scales.y, stacked: true } } }
+            });
+
+            // Purchases chart — stacked bar per country
+            charts.purchases = new Chart(document.getElementById('chartPurchases'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: COUNTRIES.map(c => ({
+                        label: c,
+                        data: dates.map(date => data.daily[date]?.[c]?.purchases || 0),
+                        backgroundColor: COLORS[c] + 'cc',
+                        borderRadius: 2
+                    }))
+                },
+                options: { ...commonOpts, scales: { ...commonOpts.scales, x: { ...commonOpts.scales.x, stacked: true }, y: { ...commonOpts.scales.y, stacked: true } } }
+            });
+
+            // CPA chart — line per country
+            charts.cpa = new Chart(document.getElementById('chartCPA'), {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: COUNTRIES.map(c => ({
+                        label: c,
+                        data: dates.map(date => {
+                            const d = data.daily[date]?.[c];
+                            return d && d.purchases > 0 ? Math.round(d.spend / d.purchases * 100) / 100 : null;
+                        }),
+                        borderColor: COLORS[c],
+                        borderWidth: 2,
+                        pointRadius: dates.length > 30 ? 0 : 3,
+                        tension: 0.3,
+                        spanGaps: true
+                    })).concat([{
+                        label: 'TOTAL',
+                        data: dailyTotals.map(d => d.purchases > 0 ? Math.round(d.spend / d.purchases * 100) / 100 : null),
+                        borderColor: '#fff',
+                        borderWidth: 3,
+                        borderDash: [6, 3],
+                        pointRadius: 0,
+                        tension: 0.3,
+                        spanGaps: true
+                    }])
+                },
+                options: { ...commonOpts, scales: { ...commonOpts.scales, y: { ...commonOpts.scales.y, ticks: { callback: v => '€' + v } } } }
+            });
+        }
+
+        function renderCountryCards(data) {
+            const div = document.getElementById('countryCards');
+            div.innerHTML = '';
+            const sorted = COUNTRIES.map(c => [c, data.byCountry[c]]).filter(([_, d]) => d && d.link_clicks > 0).sort((a, b) => b[1].purchases - a[1].purchases);
+
+            for (const [cc, c] of sorted) {
+                const flag = FLAGS[cc] || '🏳️';
+                div.innerHTML += `
+                    <div class="country-card ${cc.toLowerCase()}">
+                        <div class="country-header">
+                            <div class="country-info">
+                                <span class="country-flag">${flag}</span>
+                                <span class="country-name">${cc}</span>
+                            </div>
+                            <span class="country-roas" style="color:${crColor(c.cr_click)}">${fmtPct(c.cr_click)} CR</span>
+                        </div>
+                        <div class="country-stats" style="grid-template-columns: repeat(4, 1fr);">
+                            <div class="country-stat">
+                                <div class="country-stat-value">${fmt(c.link_clicks)}</div>
+                                <div class="country-stat-label">Link Clicks</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value">${fmt(c.purchases)}</div>
+                                <div class="country-stat-label">Purchases</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value">${fmtE(c.spend)}</div>
+                                <div class="country-stat-label">Spend</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value">${c.cpa !== null ? fmtE(c.cpa) : '—'}</div>
+                                <div class="country-stat-label">CPA</div>
+                            </div>
+                        </div>
+                        <div class="country-stats" style="grid-template-columns: repeat(4, 1fr); margin-top: 8px;">
+                            <div class="country-stat">
+                                <div class="country-stat-value">${fmtPct(c.ctr)}</div>
+                                <div class="country-stat-label">CTR</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value">${fmtPct(c.cr_landing)}</div>
+                                <div class="country-stat-label">CR (LPV)</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value">${fmtPct(c.cr_atc)}</div>
+                                <div class="country-stat-label">ATC→Purch</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value">${fmtPct(c.cr_checkout)}</div>
+                                <div class="country-stat-label">IC→Purch</div>
+                            </div>
+                        </div>
+                    </div>`;
+            }
+        }
+
+        function renderDailyTable(data) {
+            const tbody = document.getElementById('dailyBody');
+            tbody.innerHTML = '';
+            const dates = [...data.dates].reverse();
+
+            for (const date of dates) {
+                // Aggregate all countries
+                const agg = { impressions: 0, link_clicks: 0, landing_page_views: 0, view_content: 0, add_to_cart: 0, initiate_checkout: 0, purchases: 0, spend: 0 };
+                for (const c of COUNTRIES) {
+                    const d = data.daily[date]?.[c];
+                    if (!d) continue;
+                    agg.impressions += d.impressions;
+                    agg.link_clicks += d.link_clicks;
+                    agg.landing_page_views += d.landing_page_views;
+                    agg.view_content += d.view_content;
+                    agg.add_to_cart += d.add_to_cart;
+                    agg.initiate_checkout += d.initiate_checkout;
+                    agg.purchases += d.purchases;
+                    agg.spend += d.spend;
+                }
+                const cr = agg.link_clicks > 0 ? (agg.purchases / agg.link_clicks * 100) : 0;
+                const ctr = agg.impressions > 0 ? (agg.link_clicks / agg.impressions * 100) : 0;
+                const cpa = agg.purchases > 0 ? (agg.spend / agg.purchases) : null;
+                const crClass = cr >= 4 ? 'text-green' : cr >= 2.5 ? 'text-amber' : cr > 0 ? 'text-red' : '';
+
+                tbody.innerHTML += `<tr>
+                    <td>${date}</td>
+                    <td>${fmt(agg.impressions)}</td>
+                    <td>${fmt(agg.link_clicks)}</td>
+                    <td>${fmtPct(ctr)}</td>
+                    <td>${fmt(agg.landing_page_views)}</td>
+                    <td>${fmt(agg.view_content)}</td>
+                    <td>${fmt(agg.add_to_cart)}</td>
+                    <td>${fmt(agg.initiate_checkout)}</td>
+                    <td><strong>${fmt(agg.purchases)}</strong></td>
+                    <td class="${crClass}"><strong>${fmtPct(cr)}</strong></td>
+                    <td>${fmtE(agg.spend)}</td>
+                    <td>${cpa !== null ? fmtE(cpa) : '—'}</td>
+                </tr>`;
+            }
+        }
+
+        // Auto-load
+        loadData();
+    </script>
+</body>
+</html>

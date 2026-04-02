@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Events - Noriks Analytics</title>
+    <link rel="stylesheet" href="/dashboard/styles.css?v=20260311b">
+    <style>
+        .country-tabs { display: flex; gap: 0; margin-bottom: 0; border-bottom: 2px solid #e5e7eb; background: #fff; padding: 0; position: sticky; top: 0; z-index: 50; }
+        .country-tab { padding: 14px 22px; border: none; border-bottom: 3px solid transparent; background: none; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.15s; color: #9ca3af; margin-bottom: -2px; }
+        .country-tab:hover { color: #374151; background: #f9fafb; }
+        .country-tab.active { color: #111827; border-bottom-color: #111827; font-weight: 700; }
+        .country-tab .tab-count { font-weight: 800; margin-left: 4px; }
+        .tab-content-wrapper { background: #f4f5f7; padding: 20px 24px; min-height: calc(100vh - 52px); }
+        
+        .sub-tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+        .sub-tab { padding: 7px 14px; border-radius: 8px; border: 1px solid #e5e7eb; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.15s; background: #fff; color: #6b7280; }
+        .sub-tab:hover { border-color: #9ca3af; color: #374151; }
+        .sub-tab.active { background: #111827; color: #fff; border-color: #111827; }
+        .sub-tab .sub-count { font-weight: 800; margin-left: 4px; }
+        
+        .report-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+        .report-table th { background: var(--hover); padding: 6px 14px; text-align: right; font-weight: 700; border-bottom: 2px solid var(--border); font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+        .report-table th:first-child { text-align: left; }
+        .report-table td { padding: 5px 14px; border-bottom: 1px solid var(--border); text-align: right; }
+        .report-table td:first-child { text-align: left; }
+        .report-table tbody tr { transition: background 0.1s; }
+        .report-table tbody tr:hover { background: var(--hover); }
+        
+        .day-row td { color: var(--text-primary); }
+        .day-name { color: var(--text-secondary); font-size: 11px; width: 30px; display: inline-block; font-weight: 500; }
+        .weekend td { background: #f8f9fa; color: var(--text-secondary); opacity: 0.55; }
+        .today td { background: #f3f4f6; font-weight: 600; }
+        .today td:first-child { border-left: 3px solid #374151; }
+        .zero-val { color: var(--text-secondary); opacity: 0.3; }
+        .transit-val { font-weight: 800; font-size: 15px; color: var(--text-primary); }
+        .days-badge { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; margin-left: 6px; letter-spacing: 0.3px; }
+        .days-ok { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+        .days-warn { background: #fffbeb; color: #a16207; border: 1px solid #fde68a; }
+        .days-danger { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+        .days-critical { background: #991b1b; color: #fff; border: 1px solid #991b1b; }
+        
+        .expandable { cursor: pointer; user-select: none; }
+        .expand-icon { display: inline-block; width: 18px; font-size: 10px; transition: transform 0.2s; color: var(--text-secondary); }
+        .expand-icon.open { transform: rotate(90deg); }
+        .detail-row { display: none; }
+        .detail-row.open { display: table-row; }
+        .detail-row td { padding: 0; }
+        .detail-row:hover td { background: transparent !important; }
+        .order-cards { padding: 10px 16px 14px 36px; }
+        .order-card { background: #fff; border: 2px solid #1f2937; border-radius: 10px; padding: 0; margin-bottom: 8px; font-size: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); transition: box-shadow 0.15s; overflow: hidden; }
+        .order-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .order-card:last-child { margin-bottom: 0; }
+        .order-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px; }
+        .order-id { font-weight: 700; color: var(--accent); font-size: 13px; }
+        .order-total { font-weight: 700; font-size: 13px; }
+        .order-customer { font-weight: 600; margin-bottom: 4px; }
+        .order-meta { color: var(--text-secondary); font-size: 11px; margin-bottom: 5px; line-height: 1.5; }
+        .order-last-event { background: #fef3c7; border-radius: 8px; padding: 8px 12px; font-weight: 600; font-size: 12px; margin: 8px 0; border-left: 3px solid #f59e0b; }
+        .order-last-event.no-events { background: #fee2e2; border-left-color: #ef4444; }
+        .order-last-event.pickup { background: #f3f4f6; border-left-color: #6b7280; }
+        .order-last-event.failed { background: #fee2e2; border-left-color: #dc2626; }
+        .order-events { font-size: 11px; color: var(--text-secondary); margin-top: 6px; }
+        .order-events details summary { cursor: pointer; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; padding: 4px 0; }
+        .order-events .event { padding: 3px 0; border-bottom: 1px solid var(--border); }
+        .order-events .event:last-child { border: none; }
+        .loading-detail { padding: 20px; text-align: center; color: var(--text-secondary); }
+        .cs-section { margin-bottom: 24px; }
+        .cs-title { font-size: 15px; font-weight: 700; margin-bottom: 14px; color: #111827; letter-spacing: -0.2px; }
+        .cs-badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; margin-left: 8px; }
+        .cs-badge.paketomat { background: #1f2937; color: #fff; }
+        .cs-badge.posta { background: #1f2937; color: #fff; }
+        .cs-badge.failed_delivery { background: #dc2626; color: #fff; }
+        .cs-badge.stuck { background: #eab308; color: #000; }
+        .cs-badge.in_transit { background: #22c55e; color: #fff; }
+        .cs-badge.no_events { background: #9ca3af; color: #fff; }
+        .data-info { font-size: 11px; color: var(--text-secondary); margin-bottom: 12px; }
+        .rate-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+        .rate-green { background: #dcfce7; color: #166534; }
+        .rate-yellow { background: #fef9c3; color: #854d0e; }
+        .rate-red { background: #fee2e2; color: #991b1b; }
+        .empty-state { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
+        .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+        
+        .events-dual { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+        @media (max-width: 700px) { .events-dual { grid-template-columns: 1fr; } }
+        .events-col { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 11px; }
+        .events-col-title { font-weight: 700; font-size: 12px; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+        .events-col summary::-webkit-details-marker { display: none; }
+        .events-col[open] .ev-toggle { transform: rotate(90deg); }
+        .ev-toggle { display: inline-block; font-size: 9px; transition: transform 0.15s; color: #9ca3af; }
+        .events-col .event { padding: 3px 0; border-bottom: 1px solid var(--border); line-height: 1.4; }
+        .events-col .event:last-child { border: none; }
+        .events-col.metakocka { background: #fefce8; }
+        .events-col.courier { background: #f8fafc; border-color: #e2e8f0; }
+        .courier-loading { color: var(--text-secondary); font-style: italic; font-size: 11px; padding: 6px 0; }
+        
+        .order-card-inner { display: grid; grid-template-columns: 70% 30%; gap: 0; }
+        @media (max-width: 900px) { .order-card-inner { grid-template-columns: 1fr; } }
+        .order-data { min-width: 0; padding: 14px 16px; }
+        .order-sidebar { display: flex; flex-direction: column; gap: 8px; background: #f8f9fa; border-left: 2px solid #e5e7eb; padding: 14px 16px; }
+        .note-input { width: 100%; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; font-family: inherit; resize: vertical; min-height: 48px; box-sizing: border-box; line-height: 1.4; background: #fff; }
+        .note-input:focus { outline: none; border-color: #374151; box-shadow: 0 0 0 2px rgba(55,65,81,0.08); }
+        .btn-save-note { padding: 7px 0; border-radius: 6px; border: none; cursor: pointer; font-size: 12px; font-weight: 600; background: #374151; color: #fff; width: 100%; text-align: center; transition: all 0.15s; }
+        .btn-save-note:hover { background: #1f2937; }
+        .btn-save-note.saved { background: #16a34a; }
+        .btn-done { padding: 8px 0; border-radius: 6px; border: 2px solid #d1d5db; cursor: pointer; font-size: 12px; font-weight: 700; transition: all 0.15s; background: #fff; width: 100%; text-align: center; color: #374151; }
+        .btn-done:hover { background: #f3f4f6; border-color: #9ca3af; }
+        .btn-done.is-done { background: #16a34a; color: #fff; border-color: #16a34a; }
+        .order-card.is-done { opacity: 0.45; border-left: 3px solid #16a34a; }
+        .order-card.is-done:hover { opacity: 0.75; }
+        .sidebar-label { font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.8px; }
+        
+        .day-group-header { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; padding: 8px 0; }
+        .day-group-header:hover { opacity: 0.8; }
+        .day-group-toggle { font-size: 10px; transition: transform 0.2s; color: #9ca3af; }
+        .day-group-toggle.collapsed { transform: rotate(-90deg); }
+        .day-group-content { overflow: hidden; }
+        .day-group-content.collapsed { display: none; }
+    </style>
+</head>
+<body>
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <aside class="sidebar"></aside>
+
+    <main class="main" style="min-height:100vh;">
+        <div class="content" style="padding:0;max-width:100%;">
+            <div id="countryTabs" class="country-tabs"></div>
+            <div class="tab-content-wrapper">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                    <div id="dataInfo" class="data-info" style="margin-bottom:0;"></div>
+                    <button onclick="location.reload()" style="background:#1f2937;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">🔄 Osveži</button>
+                </div>
+                
+                <!-- Report table per country -->
+                <div id="reportSection" class="cs-section" style="background:#fff;border-radius:10px;border:1px solid #e5e7eb;padding:16px 18px;margin-bottom:16px;">
+                    <div class="cs-title">📊 Pregled po datumu odpreme</div>
+                    <div id="reportContent"></div>
+                </div>
+                
+                <!-- CS Action Required section -->
+                <div id="csSection" class="cs-section" style="background:#fff;border-radius:10px;border:1px solid #e5e7eb;padding:16px 18px;">
+                    <div class="cs-title">🎯 CS Action Required <span id="csTotalCount" style="font-weight:800;"></span></div>
+                    <div id="subTabs" class="sub-tabs"></div>
+                    <div id="csOrders" style="margin-top: 12px;"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <script src="/dashboard/sidebar.js"></script>
+    <script>renderSidebar('live-events');</script>
+    <script>
+        const CURRENCY = { HR: '€', CZ: 'Kč', PL: 'zł', GR: '€', SK: '€', IT: '€', HU: 'Ft' };
+        const FLAGS = { HR: '🇭🇷', CZ: '🇨🇿', PL: '🇵🇱', GR: '🇬🇷', SK: '🇸🇰', IT: '🇮🇹', HU: '🇭🇺' };
+        const COUNTRY_NAMES = { HR: 'Hrvaška', CZ: 'Češka', PL: 'Poljska', GR: 'Grčija', SK: 'Slovaška', IT: 'Italija', HU: 'Madžarska' };
+        const DAY_NAMES = ['NED', 'PON', 'TOR', 'SRE', 'ČET', 'PET', 'SOB'];
+        const COUNTRY_ORDER = ['HR', 'CZ', 'PL', 'GR', 'SK', 'IT', 'HU'];
+        
+        let rejectionData = null;
+        let currentCountry = null;
+        let currentSubTab = 'transit_3plus';  // default to most urgent
+        let csNotesData = {}; // notes + done per order
+        
+        function v(n) { return n === 0 ? '<span class="zero-val">0</span>' : n; }
+        
+        function rateBadge(pct, isRejection) {
+            const val = pct.toFixed(1) + '%';
+            if (pct === 0) return '<span class="rate-badge" style="background:#f3f4f6;color:#9ca3af;">0%</span>';
+            if (isRejection) {
+                let cls = pct >= 10 ? 'rate-red' : pct >= 5 ? 'rate-yellow' : 'rate-green';
+                return `<span class="rate-badge ${cls}">${val}</span>`;
+            } else {
+                let cls = pct >= 80 ? 'rate-green' : pct >= 50 ? 'rate-yellow' : 'rate-red';
+                return `<span class="rate-badge ${cls}">${val}</span>`;
+            }
+        }
+        
+        function businessDaysSince(dateStr) {
+            const start = new Date(dateStr + 'T00:00:00');
+            const end = new Date();
+            end.setHours(0,0,0,0);
+            let count = 0;
+            const d = new Date(start);
+            while (d < end) {
+                d.setDate(d.getDate() + 1);
+                const dow = d.getDay();
+                if (dow !== 0 && dow !== 6) count++;
+            }
+            return count;
+        }
+        
+        function daysBadge(days) {
+            let cls = 'days-ok';
+            if (days >= 7) cls = 'days-critical';
+            else if (days >= 5) cls = 'days-danger';
+            else if (days >= 3) cls = 'days-warn';
+            return `<span class="days-badge ${cls}">${days}d</span>`;
+        }
+        
+        // Skip fresh orders that just got labels (not real problems)
+        function isFreshOrder(order) {
+            const lastCode = (order.lastEvent?.code || '').toString();
+            return ['200', '-1', '-2', '190', '0'].includes(lastCode) || !order.lastEvent;
+        }
+        
+        // Classify into sub-tab categories
+        function getSubCategory(order) {
+            if (isFreshOrder(order)) return 'fresh';
+            const cs = order.csStatus || 'no_events';
+            if (cs === 'paketomat') return 'paketomat';
+            if (cs === 'posta') return 'posta';
+            // In transit: split by days
+            const bDays = businessDaysSince(order.shippedDate || '');
+            if (bDays > 3) return 'transit_3plus';
+            return 'transit_3';
+        }
+        
+        function getOrdersForCountry(country) {
+            return (rejectionData.in_transit_orders || []).filter(o => o.country_iso === country);
+        }
+        
+        function renderTabs() {
+            const countries = COUNTRY_ORDER.filter(iso => 
+                rejectionData.by_date_country.some(r => r.country_iso === iso)
+            );
+            if (!currentCountry || !countries.includes(currentCountry)) currentCountry = countries[0];
+            
+            const countryTotals = {};
+            for (const r of rejectionData.by_date_country) {
+                if (!countryTotals[r.country_iso]) countryTotals[r.country_iso] = { shipped: 0, in_transit: 0 };
+                countryTotals[r.country_iso].shipped += r.shipped;
+                countryTotals[r.country_iso].in_transit += r.in_transit;
+            }
+            
+            // Count ALL CS orders per country (must match CS Action Required total)
+            const orders = rejectionData.in_transit_orders || [];
+            const csCountByCountry = {};
+            for (const o of orders) {
+                csCountByCountry[o.country_iso] = (csCountByCountry[o.country_iso] || 0) + 1;
+            }
+            
+            document.getElementById('countryTabs').innerHTML = countries.map(iso => {
+                const t = countryTotals[iso] || { shipped: 0, in_transit: 0 };
+                const csCount = csCountByCountry[iso] || 0;
+                const csIndicator = csCount > 0 ? ` <span style="color:#dc2626;font-weight:800;">⚠${csCount}</span>` : '';
+                return `<div class="country-tab ${iso === currentCountry ? 'active' : ''}" onclick="switchCountry('${iso}')">${FLAGS[iso] || ''} ${COUNTRY_NAMES[iso] || iso} <strong>${t.in_transit}</strong>/${t.shipped}${csIndicator}</div>`;
+            }).join('');
+        }
+        
+        function switchCountry(iso) {
+            currentCountry = iso;
+            currentSubTab = 'transit_3plus';
+            renderTabs();
+            renderSubTabs();
+            renderCsOrders();
+            renderReport();
+        }
+        
+        function renderSubTabs() {
+            const allOrders = getOrdersForCountry(currentCountry);
+            const orders = allOrders.filter(o => !isFreshOrder(o));
+            
+            const countTransit3 = orders.filter(o => getSubCategory(o) === 'transit_3').length;
+            const countTransit3plus = orders.filter(o => getSubCategory(o) === 'transit_3plus').length;
+            const countPaketomat = orders.filter(o => getSubCategory(o) === 'paketomat').length;
+            const countPosta = orders.filter(o => getSubCategory(o) === 'posta').length;
+            const countFresh = allOrders.filter(o => isFreshOrder(o)).length;
+            const csTotal = countTransit3 + countTransit3plus + countPaketomat + countPosta + countFresh;
+            document.getElementById('csTotalCount').textContent = csTotal;
+            
+            document.getElementById('subTabs').innerHTML = [
+                { key: 'transit_3plus', label: '🔴 V dostavi (3+ dni)', count: countTransit3plus },
+                { key: 'paketomat', label: '📦 Paketomat', count: countPaketomat },
+                { key: 'posta', label: '📮 Pošta', count: countPosta },
+                { key: 'transit_3', label: '📦 V dostavi (≤3 dni)', count: countTransit3 },
+                { key: 'fresh', label: '📤 Pravkar odpremljeno', count: countFresh }
+            ].filter(t => t.count > 0 || t.key === 'transit_3' || t.key === 'transit_3plus').map(t => 
+                `<div class="sub-tab ${currentSubTab === t.key ? 'active' : ''}" onclick="switchSubTab('${t.key}')">${t.label} <span class="sub-count">${t.count}</span></div>`
+            ).join('');
+        }
+        
+        function switchSubTab(tab) {
+            currentSubTab = tab;
+            renderSubTabs();
+            renderCsOrders();
+        }
+        
+        const EVENT_LABELS = {
+            'adopted_at_source_branch': '📥 Prevzeto na izvoru',
+            'redirect_to_box': '📦 Preusmeritev na paketomat',
+            'confirmed': '✅ Potrjeno',
+            'sent_from_source_branch': '🚚 Odposlano iz izvora',
+            'in_transit': '🚚 V tranzitu',
+            'arrived_at_destination_branch': '🏢 Prispelo na ciljno pošto',
+            'ready_for_pickup': '📬 Pripravljeno za prevzem',
+            'picked_up': '✅ Prevzeto',
+            'delivered': '✅ Dostavljeno',
+            'out_for_delivery': '🚛 Na poti dostave',
+            'returned': '↩️ Vrnjeno',
+            'not_delivered': '❌ Ni dostavljeno',
+            'failed_delivery': '❌ Neuspešna dostava',
+            'customs_clearance': '🛃 Carinjenje',
+            'awaiting_pickup': '📬 Čaka na prevzem',
+            'stored_at_post_office': '🏤 Shranjeno na pošti',
+            'left_country': '✈️ Zapustilo državo',
+            'arrived_in_country': '✈️ Prispelo v državo',
+            'sorting': '🔄 Sortiranje',
+            'registered': '📋 Registrirano',
+            'cancelled': '🚫 Preklicano',
+            'refused': '🚫 Zavrnjeno',
+            'lost': '❌ Izgubljeno',
+        };
+        function friendlyEvent(status) {
+            if (!status) return '';
+            const s = status.trim();
+            return EVENT_LABELS[s] || s.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
+        const EXPEDICO_COUNTRIES = ['GR','SK','CZ','IT','PL'];
+        const DIRECT_CARRIER_COUNTRIES = ['HR','HU']; // These go direct to local carrier API, no Expedico
+        const LOCAL_TRACKING_URLS = {
+            CZ: code => 'https://www.postaonline.cz/en/trackandtrace/-/zasilka/cislo?parcelNumbers=' + encodeURIComponent(code),
+            SK: code => 'https://www.sps-sro.sk/en/moja-zasielka?shipment_id=' + encodeURIComponent(code),
+            GR: code => 'https://www.acscourier.net/en/myacs/my-shipments-reports/track-and-trace/?trackno=' + encodeURIComponent(code),
+            HU: code => 'https://gls-group.com/HU/hu/csomagkovetes?match=' + encodeURIComponent(code),
+            IT: code => 'https://www.poste.it/cerca/index.html#/risultati-ricerca-702010/' + encodeURIComponent(code),
+            HR: code => 'https://posiljka.posta.hr/hr/tracking/trackingdata?barcode=' + encodeURIComponent(code),
+            PL: code => 'https://inpost.pl/en/find-parcel?number=' + encodeURIComponent(code),
+        };
+
+        function trackingUrl(code, country) {
+            if (!code) return null;
+            const c = (country || '').toUpperCase();
+            // For Expedico countries, prefer local tracking URL first (code may be local carrier code)
+            if (LOCAL_TRACKING_URLS[c]) return LOCAL_TRACKING_URLS[c](code);
+            if (EXPEDICO_COUNTRIES.includes(c)) return 'https://expedico.eu/tracking?code=' + encodeURIComponent(code);
+            return null;
+        }
+        
+        function localTrackingUrl(code, country) {
+            if (!code) return null;
+            const c = (country || '').toUpperCase();
+            return LOCAL_TRACKING_URLS[c] ? LOCAL_TRACKING_URLS[c](code) : null;
+        }
+
+        function trackingLink(code, country) {
+            if (!code) return '';
+            const url = trackingUrl(code, country);
+            return url ? `<a href="${url}" target="_blank" style="color:#6b7280;text-decoration:underline;">${code}</a>` : code;
+        }
+        
+        function localTrackingLink(code, country) {
+            if (!code) return '';
+            const url = localTrackingUrl(code, country);
+            return url ? `<a href="${url}" target="_blank" style="color:#6b7280;text-decoration:underline;">${code}</a>` : code;
+        }
+        
+        function csStatusLabel(cs) {
+            const map = {
+                paketomat: '📦 Paketomat',
+                posta: '📮 Pošta',
+                failed_delivery: '🔴 Failed',
+                stuck: '🟡 Stuck',
+                in_transit: '🟢 V dostavi',
+                no_events: '⚪ Brez eventov'
+            };
+            return map[cs] || cs;
+        }
+        
+        // Cache for courier tracking events
+        const courierTrackingCache = {};
+        async function fetchCourierEvents(trackingCode, country) {
+            if (!trackingCode) return null;
+            if (courierTrackingCache[trackingCode]) return courierTrackingCache[trackingCode];
+            try {
+                const c = (country || '').toUpperCase();
+                if (DIRECT_CARRIER_COUNTRIES.includes(c)) {
+                    // Direct carrier countries — no Expedico
+                    if (c === 'HR') {
+                        const res = await fetch('/dashboard/api/hr-tracking?barcode=' + encodeURIComponent(trackingCode));
+                        if (!res.ok) { console.error('HR tracking failed:', res.status, trackingCode); return null; }
+                        const data = await res.json();
+                        const hrEvents = (data.events || []).map(e => ({
+                            date: e.date || '',
+                            status: e.status + (e.detail ? ' — ' + e.detail : ''),
+                            code: '',
+                            sys: ''
+                        }));
+                        courierTrackingCache[trackingCode] = { carrier: 'Hrvatska Pošta', events: hrEvents, location: data.location, arrivedAt: data.arrivedAt, arrivedLocation: data.arrivedLocation };
+                        return courierTrackingCache[trackingCode];
+                    } else if (c === 'HU') {
+                        const res = await fetch('/dashboard/api/local-tracking?code=' + encodeURIComponent(trackingCode) + '&country=HU');
+                        if (!res.ok) { console.error('HU GLS tracking failed:', res.status, trackingCode); return null; }
+                        const data = await res.json();
+                        const huEvents = (data.events || []).map(e => ({
+                            date: e.date || '',
+                            status: e.status || '',
+                            code: '',
+                            sys: ''
+                        }));
+                        courierTrackingCache[trackingCode] = { carrier: 'GLS Hungary', events: huEvents, location: data.location };
+                        return courierTrackingCache[trackingCode];
+                    }
+                } else {
+                    // Expedico countries: first get localCode from Expedico, then fetch local carrier events
+                    const expRes = await fetch('/dashboard/api/expedico-tracking?code=' + encodeURIComponent(trackingCode));
+                    if (!expRes.ok) { console.error('Expedico tracking failed:', expRes.status, trackingCode); return null; }
+                    const expData = await expRes.json();
+                    const localCode = expData.tracking?.trackingCode || '';
+                    const expCarrier = expData.tracking?.carrier?.labelEn || 'Expedico';
+                    const expState = expData.tracking?.packetState?.labelEn || '';
+                    
+                    // Try local carrier scraping with localCode
+                    let localEvents = [], localLocation = null, localCarrier = expCarrier;
+                    if (localCode && ['CZ','GR','SK','HU','PL'].includes(c)) {
+                        try {
+                            const localRes = await fetch('/dashboard/api/local-tracking?code=' + encodeURIComponent(localCode) + '&country=' + c);
+                            if (localRes.ok) {
+                                const localData = await localRes.json();
+                                localCarrier = localData.carrier || expCarrier;
+                                localLocation = localData.location || null;
+                                localEvents = (localData.events || []).map(e => ({
+                                    date: e.date || '',
+                                    status: e.status || '',
+                                    code: '',
+                                    sys: ''
+                                }));
+                            }
+                        } catch (le) { console.error('Local tracking error:', le); }
+                    }
+                    
+                    // Fallback to Expedico events if local scraping returned nothing
+                    if (localEvents.length === 0 && expData.tracking) {
+                        const rawEvts = (expData.tracking.events || []);
+                        const hasLocal = rawEvts.some(e => e.carrierStateDescription);
+                        localEvents = (hasLocal ? rawEvts.filter(e => e.carrierStateDescription) : rawEvts).map(e => ({
+                            date: e.occuredOn || '',
+                            status: e.carrierStateDescription || e.packetState?.labelEn || '',
+                            code: e.packetState?.id || '',
+                            sys: e.packetState?.sys || ''
+                        }));
+                        localEvents.reverse();
+                        const lastDesc = localEvents.length > 0 ? localEvents[0].status : '';
+                        const locM = lastDesc.match(/\(([^)]+)\)\s*$/);
+                        if (locM) localLocation = locM[1];
+                    }
+                    
+                    const result = {
+                        carrier: localCarrier,
+                        state: expState,
+                        localCode,
+                        location: localLocation,
+                        events: localEvents
+                    };
+                    courierTrackingCache[trackingCode] = result;
+                    return result;
+                }
+            } catch (e) { console.error('Courier fetch error:', e); }
+            return null;
+        }
+        
+        // Populate courier events column after rendering
+        async function loadCourierEventsForCards(orders) {
+            for (const o of orders) {
+                if (!o.trackingCode) continue;
+                const courierId = 'courier-' + (o.trackingCode || o.id || '').toString().replace(/[^a-z0-9]/gi,'');
+                const el = document.getElementById(courierId);
+                if (!el) continue;
+                const data = await fetchCourierEvents(o.trackingCode, o.country_iso);
+                if (!data) {
+                    el.querySelector('.courier-loading').innerHTML = '<span style="opacity:0.5;">Ni podatkov kurirja</span>';
+                    continue;
+                }
+                // Fill local tracking code placeholder for Expedico countries
+                if (data.localCode) {
+                    const trackEl = document.getElementById('track-' + (o.trackingCode || o.id || '').toString().replace(/[^a-z0-9]/gi,''));
+                    if (trackEl) {
+                        const localUrl = localTrackingUrl(data.localCode, o.country_iso);
+                        trackEl.innerHTML = '| 📦 ' + (localUrl ? '<a href="' + localUrl + '" target="_blank" style="color:#6b7280;text-decoration:underline;">' + data.localCode + '</a>' : data.localCode);
+                    }
+                }
+                const lastEvtText = data.events.length > 0 ? ' — ' + friendlyEvent(data.events[0].status) : '';
+                let html = `<summary class="events-col-title" style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px;"><span class="ev-toggle">▶</span> 🚚 ${data.carrier} (${data.events.length})${lastEvtText}${data.localCode ? ' <span style="font-weight:400;font-size:10px;color:var(--text-secondary);">' + data.localCode + '</span>' : ''}</summary>`;
+                if (o.csStatus === 'paketomat' || o.csStatus === 'posta') {
+                    if (data.location) {
+                        html += '<div style="background:#f0fdf4;border-radius:6px;padding:6px 8px;margin-bottom:4px;font-weight:600;font-size:11px;color:#166534;">📍 ' + data.location + '</div>';
+                    } else {
+                        html += '<div style="background:#fee2e2;border-radius:6px;padding:6px 8px;margin-bottom:4px;font-weight:600;font-size:11px;color:#991b1b;">📍 NI ZNANO</div>';
+                    }
+                }
+                if (data.events.length > 0) {
+                    html += data.events.map(e => {
+                        const dateStr = (e.date || '').includes('T') ? (e.date || '').substring(0, 16).replace('T',' ') : (e.date || '').substring(0, 20);
+                        const codeStr = e.code ? '<strong>' + e.code + '</strong> ' : '';
+                        return '<div class="event">📌 ' + dateStr + ' — ' + codeStr + friendlyEvent(e.status) + '</div>';
+                    }).join('');
+                } else if (!data.location) {
+                    html += '<div style="opacity:0.5;padding:6px 0;">Ni eventov kurirja</div>';
+                }
+                el.innerHTML = html;
+                
+                // Update pickup location on badge
+                if (o.csStatus === 'paketomat' || o.csStatus === 'posta') {
+                    const cardEl = document.getElementById('card-' + (o.title || o.id || ''));
+                    if (cardEl) {
+                        const badgeEl = cardEl.querySelector('.cs-badge.paketomat, .cs-badge.posta');
+                        if (badgeEl) {
+                            badgeEl.innerHTML += data.location ? ' — ' + data.location : ' — <span style="color:#ff6b6b;">NI ZNANO</span>';
+                        }
+                    }
+                }
+
+                // Update courier alert banner
+                const alertId = 'calert-' + (o.trackingCode || o.id || '').toString().replace(/[^a-z0-9]/gi,'');
+                const alertEl = document.getElementById(alertId);
+                if (alertEl && data) {
+                    const lastCourier = data.events.length > 0 ? data.events[0] : null;
+                    if (lastCourier) {
+                        const dateStr = (lastCourier.date || '').includes('T') ? (lastCourier.date || '').substring(0, 16).replace('T',' ') : (lastCourier.date || '').substring(0, 20);
+                        const locText = (o.csStatus === 'paketomat' || o.csStatus === 'posta') ? (data.location ? ' · 📍 ' + data.location : ' · <span style="color:#991b1b;">📍 NI ZNANO</span>') : '';
+                        alertEl.innerHTML = '🚚 Kurir: ' + dateStr + ' — ' + friendlyEvent(lastCourier.status) + locText;
+                        alertEl.style.background = '#f3f4f6';
+                        alertEl.style.borderLeftColor = '#6b7280';
+                    } else if (data.location && (o.csStatus === 'paketomat' || o.csStatus === 'posta')) {
+
+                        alertEl.innerHTML = '🚚 📍 ' + data.location;
+                        alertEl.style.background = '#f0fdf4';
+                        alertEl.style.borderLeftColor = '#16a34a';
+                    } else {
+                        alertEl.innerHTML = '🚚 Kurir: Ni podatkov';
+                        alertEl.style.background = '#f3f4f6';
+                        alertEl.style.borderLeftColor = '#9ca3af';
+                    }
+                }
+            }
+        }
+        
+        // Cache for HR tracking location lookups
+        const hrTrackingCache = {};
+        
+        async function fetchHrTracking(barcode) {
+            if (hrTrackingCache[barcode]) return hrTrackingCache[barcode];
+            try {
+                const res = await fetch('/dashboard/api/hr-tracking?barcode=' + encodeURIComponent(barcode));
+                const data = await res.json();
+                hrTrackingCache[barcode] = data;
+                return data;
+            } catch (e) { return null; }
+        }
+        
+        function renderOrderCard(o) {
+            const cs = o.csStatus || 'no_events';
+            const bDays = businessDaysSince(o.shippedDate);
+            let badge = isFreshOrder(o) 
+                ? '<span class="cs-badge in_transit">📤 Odpremljeno</span>'
+                : `<span class="cs-badge ${cs}">${csStatusLabel(cs)}</span>`;
+            if ((cs === 'paketomat' || cs === 'posta') && o._waitDays !== undefined) {
+                const wd = o._waitDays;
+                badge += ` <span class="days-badge ${wd >= 5 ? 'days-critical' : wd >= 3 ? 'days-danger' : wd >= 1 ? 'days-warn' : 'days-ok'}">${wd}d v ${cs === 'paketomat' ? 'paketomatu' : 'pošti'}</span>`;
+            }
+            
+            const metakockaHtml = o.events && o.events.length > 0 
+                ? [...(o.events || [])].reverse().map(e => '<div class="event">📌 ' + (e.date || '').substring(0, 16) + ' — <strong>' + (e.code || '') + '</strong> ' + (e.status || '') + '</div>').join('')
+                : '<div style="opacity:0.5;padding:6px 0;">Ni eventov</div>';
+            
+            const courierId = 'courier-' + (o.trackingCode || o.id || Math.random()).toString().replace(/[^a-z0-9]/gi,'');
+            
+            const eventsHtml = `<div class="events-dual">
+                <details class="events-col metakocka">
+                    <summary class="events-col-title" style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px;">
+                        <span class="ev-toggle">▶</span> 📦 Metakocka dogodki (${(o.events||[]).length})${o.events && o.events.length > 0 ? ' — <strong>' + (o.events[o.events.length-1].code || '') + '</strong> ' + (o.events[o.events.length-1].status || '') : ''}
+                    </summary>
+                    ${metakockaHtml}
+                </details>
+                <details class="events-col courier" id="${courierId}">
+                    <summary class="events-col-title" style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px;">
+                        <span class="ev-toggle">▶</span> 🚚 Kurir dogodki
+                    </summary>
+                    <div class="courier-loading">⏳ Nalagam...</div>
+                </details>
+            </div>`;
+            
+            const isPickup = false;
+            const pickupId = '';
+            
+            let lastEvtClass = '';
+            if (cs === 'paketomat' || cs === 'posta') lastEvtClass = ' pickup';
+            else if (cs === 'failed_delivery') lastEvtClass = ' failed';
+            else if (cs === 'no_events') lastEvtClass = ' no-events';
+            
+            const lastEvt = o.lastEvent 
+                ? `<div class="order-last-event${lastEvtClass}">📦 Metakocka: ${(o.lastEvent.date || '').substring(0, 16)} — <strong>${o.lastEvent.code || ''}</strong> ${o.lastEvent.status || ''}</div>` 
+                : `<div class="order-last-event no-events">📦 Metakocka: Ni statusov</div>`;
+            
+            const courierAlertId = 'calert-' + (o.trackingCode || o.id || Math.random()).toString().replace(/[^a-z0-9]/gi,'');
+            
+            let tInfo;
+            const c = (o.country_iso || '').toUpperCase();
+            const trackId = 'track-' + (o.trackingCode || o.id || Math.random()).toString().replace(/[^a-z0-9]/gi,'');
+            if (EXPEDICO_COUNTRIES.includes(c) && o.trackingCode) {
+                // Expedico countries: first code links to Expedico, local code (filled async) links to local carrier
+                const expUrl = 'https://expedico.eu/tracking?code=' + encodeURIComponent(o.trackingCode);
+                const mainLink = `🚚 <a href="${expUrl}" target="_blank" style="color:#6b7280;text-decoration:underline;">${o.trackingCode}</a>`;
+                tInfo = mainLink + `<span id="${trackId}"></span>`;
+            } else {
+                tInfo = o.trackingCode 
+                    ? '📦 ' + trackingLink(o.trackingCode, o.country_iso) + (o.localTrackingCode ? ' + ' + trackingLink(o.localTrackingCode, o.country_iso) : '')
+                    : '📦 Ni kode za sledenje';
+            }
+            
+            const pickupBanner = isPickup 
+                ? `<div id="${pickupId}" style="background:#f0fdf4;border:2px solid #16a34a;border-radius:10px;padding:10px 14px;margin-bottom:8px;font-weight:700;font-size:13px;color:#166534;">📍 Nalagam lokacijo...</div>`
+                : '';
+            
+            const oid = o.title || o.id || '';
+            const noteData = csNotesData[oid] || {};
+            const isDone = noteData.done ? true : false;
+            const savedNote = noteData.note || '';
+            
+            return `<div class="order-card ${isDone ? 'is-done' : ''}" id="card-${oid}">
+                <div class="order-card-inner">
+                    <div class="order-data">
+                        <div class="order-header">
+                            <span class="order-id">${oid}</span>
+                            ${badge} 
+                            <span class="order-total">${o.total || '?'} ${CURRENCY[o.country_iso] || '€'}</span>
+                            ${o.items && o.items.length > 0 ? '<span style="font-size:11px;color:#6b7280;margin-left:6px;">' + o.items.map(i => (i.amount > 1 ? i.amount + '× ' : '') + i.name).join(', ') + '</span>' : ''}
+                        </div>
+                        ${pickupBanner}
+                        <div class="order-customer">👤 ${o.customer || 'N/A'}</div>
+                        <div class="order-meta">📍 ${o.address || 'N/A'}</div>
+                        <div class="order-meta">${o.phone ? '📞 ' + o.phone + ' ' : ''}${o.email ? '✉️ ' + o.email : ''}</div>
+                        <div class="order-meta">🚚 ${o.deliveryService || 'N/A'} | ${tInfo}</div>
+                        <div class="order-meta">📅 Odpremljeno: ${o.shippedDate || '?'} ${daysBadge(bDays)}</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">${lastEvt}<div class="order-last-event" id="${courierAlertId}" style="background:#f3f4f6;border-left-color:#6b7280;">🚚 Kurir: nalagam...</div></div>
+                        ${eventsHtml}
+                    </div>
+                    <div class="order-sidebar">
+                        <div class="sidebar-label">Opomba</div>
+                        <textarea class="note-input" id="note-${oid}" placeholder="Zapiši opombo...">${savedNote}</textarea>
+                        <button class="btn-save-note" onclick="saveNoteBtn('${oid}', this)">💾 Shrani</button>
+                        <div style="border-top:1px solid #e5e7eb;margin:2px 0;"></div>
+                        <button class="btn-done ${isDone ? 'is-done' : ''}" onclick="toggleDone('${oid}', this)">${isDone ? '✅ Urejeno' : '☐ Označi urejeno'}</button>
+                    </div>
+                </div>
+            </div>`;
+        }
+        
+        async function renderCsOrders() {
+            const allCsOrders = getOrdersForCountry(currentCountry);
+            let filtered;
+            if (currentSubTab === 'fresh') {
+                filtered = allCsOrders.filter(o => isFreshOrder(o));
+            } else {
+                filtered = allCsOrders.filter(o => !isFreshOrder(o) && getSubCategory(o) === currentSubTab);
+            }
+            
+            // Sort: oldest first (most urgent)
+            filtered.sort((a, b) => (a.shippedDate || '').localeCompare(b.shippedDate || ''));
+            
+            if (filtered.length === 0) {
+                document.getElementById('csOrders').innerHTML = `<div class="empty-state"><div class="icon">✅</div><div>Ni naročil s tem statusom za ${COUNTRY_NAMES[currentCountry]}</div></div>`;
+                return;
+            }
+            
+            // For paketomat/posta tabs, group by days waiting
+            const isPickupTab = (currentSubTab === 'paketomat' || currentSubTab === 'posta');
+            
+            if (isPickupTab && filtered.length > 0) {
+                // First render loading state
+                document.getElementById('csOrders').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-secondary);">⏳ Nalagam lokacije...</div>';
+                
+                // Fetch all tracking data
+                const pickupOrders = filtered.filter(o => o.country_iso === 'HR' && o.trackingCode);
+                const results = await Promise.all(pickupOrders.map(async o => {
+                    const data = await fetchHrTracking(o.trackingCode);
+                    let waitDays = 0;
+                    let location = null;
+                    // Use arrivedAt, or fallback to first event date
+                    let dateStr = data?.arrivedAt || '';
+                    if (!dateStr && data?.events?.length > 0) {
+                        dateStr = data.events[0].date || '';
+                    }
+                    const match = dateStr.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+                    if (match) {
+                        const arrivedDate = new Date(match[3] + '-' + match[2] + '-' + match[1] + 'T00:00:00');
+                        const today = new Date(); today.setHours(0,0,0,0);
+                        waitDays = Math.round((today - arrivedDate) / (1000 * 60 * 60 * 24));
+                        if (waitDays < 0) waitDays = 0;
+                    }
+                    if (data?.location) location = data.location;
+                    // Fallback location from events
+                    if (!location && data?.events?.length > 0) {
+                        const evtDetail = data.events[0].detail || '';
+                        if (evtDetail.includes('paketomat') || evtDetail.includes('poštanski')) location = evtDetail;
+                    }
+                    return { order: o, waitDays, location };
+                }));
+                
+                // Also include non-HR orders (no scraping available — use event dates + customer address)
+                const nonHr = filtered.filter(o => o.country_iso !== 'HR' || !o.trackingCode);
+                for (const o of nonHr) {
+                    const pakEvt = [...(o.events || [])].reverse().find(e => ['PAK','ZOT','400','IZM'].includes(e.code));
+                    let waitDays = 0;
+                    if (pakEvt?.date) {
+                        const d = new Date(pakEvt.date.replace(/\+.*/, '') + 'T00:00:00');
+                        const today = new Date(); today.setHours(0,0,0,0);
+                        waitDays = Math.round((today - d) / (1000 * 60 * 60 * 24));
+                        if (waitDays < 0) waitDays = 0;
+                    }
+                    // Use destination branch info or customer city as location
+                    const city = (o.address || '').split(',').slice(-2, -1)[0]?.trim() || (o.address || '').split(',')[0]?.trim();
+                    const loc = city ? 'Destination branch · ' + city : null;
+                    results.push({ order: o, waitDays, location: loc });
+                }
+                
+                // Group by days
+                const groups = {};
+                for (const r of results) {
+                    const key = r.waitDays;
+                    if (!groups[key]) groups[key] = [];
+                    groups[key].push(r);
+                }
+                
+                // Sort keys descending (longest waiting first)
+                const sortedKeys = Object.keys(groups).map(Number).sort((a, b) => b - a);
+                
+                let html = '';
+                for (let i = 0; i < sortedKeys.length; i++) {
+                    const days = sortedKeys[i];
+                    const items = groups[days];
+                    const urgencyColor = days >= 4 ? '#dc2626' : days >= 3 ? '#f59e0b' : days >= 1 ? '#6b7280' : '#22c55e';
+                    const daysText = days === 0 ? 'Danes' : days === 1 ? '1 dan' : days === 2 ? '2 dneva' : days + ' dni';
+                    const groupId = 'daygroup-' + days;
+                    
+                    html += `<div class="day-group-header" onclick="toggleDayGroup('${groupId}')" style="margin-top:${i > 0 ? '16px' : '0'};">
+                        <span class="day-group-toggle collapsed" id="toggle-${groupId}">▼</span>
+                        <span style="width:10px;height:10px;border-radius:50%;background:${urgencyColor};flex-shrink:0;"></span>
+                        <span style="font-size:15px;font-weight:700;color:#111827;">${daysText} v ${currentSubTab === 'paketomat' ? 'paketomatu' : 'pošti'}</span>
+                        <span style="font-size:13px;color:#6b7280;font-weight:600;">${items.length} naročil</span>
+                        <span style="flex:1;height:1px;background:#e5e7eb;"></span>
+                    </div>
+                    <div class="day-group-content collapsed" id="${groupId}">`;
+                    
+                    for (const r of items) {
+                        r.order._waitDays = r.waitDays;
+                        html += renderOrderCard(r.order);
+                    }
+                    html += '</div>';
+                }
+                
+                document.getElementById('csOrders').innerHTML = html;
+                loadCourierEventsForCards(filtered);
+            } else {
+                document.getElementById('csOrders').innerHTML = filtered.map(renderOrderCard).join('');
+                loadCourierEventsForCards(filtered);
+            }
+        }
+        
+        function renderReport() {
+            const dateData = rejectionData.by_date_country.filter(r => r.country_iso === currentCountry);
+            const allDates = dateData.filter(d => d.in_transit > 0).sort((a, b) => a.date.localeCompare(b.date));
+            
+            const ordersByDate = {};
+            for (const o of (rejectionData.in_transit_orders || [])) {
+                if (o.country_iso !== currentCountry) continue;
+                const d = o.shippedDate || 'unknown';
+                if (!ordersByDate[d]) ordersByDate[d] = [];
+                ordersByDate[d].push(o);
+            }
+            
+            if (allDates.length === 0) {
+                document.getElementById('reportContent').innerHTML = '<div class="loading-detail">✅ Ni naročil v tranzitu</div>';
+                return;
+            }
+            
+            const todayStr = new Date().toISOString().split('T')[0];
+            
+            let html = `<table class="report-table">
+                <thead><tr>
+                    <th style="text-align:left">Datum odpreme</th>
+                    <th>Dni</th>
+                    <th>Shipped</th>
+                    <th>Completed</th>
+                    <th>Rejected</th>
+                    <th>In Transit</th>
+                    <th style="border-left:2px solid #d1d5db;">Acc. Rate</th>
+                    <th style="text-align:center">Transit</th>
+                    <th style="text-align:left">Rej. Rate</th>
+                </tr></thead><tbody>`;
+            
+            for (const d of allDates) {
+                const dt = new Date(d.date + 'T00:00:00');
+                const dow = dt.getDay();
+                const isWeekend = dow === 0 || dow === 6;
+                const isToday = d.date === todayStr;
+                const rowId = d.date + '_' + currentCountry;
+                const hasOrders = (ordersByDate[d.date] || []).length > 0;
+                const bDays = businessDaysSince(d.date);
+                
+                const accRate = d.shipped > 0 ? (d.completed / d.shipped * 100) : 0;
+                const rejRate = d.shipped > 0 ? (d.rejected / d.shipped * 100) : 0;
+                const transitRate = d.shipped > 0 ? (d.in_transit / d.shipped * 100) : 0;
+                
+                // Arrow visualization: transit flows left to acc or right to rej
+                const arrowHtml = d.in_transit > 0 && d.shipped > 0
+                    ? `<span style="font-size:13px;letter-spacing:1px;"><span style="color:#16a34a;">←</span> <span style="font-weight:700;color:#374151;">${d.in_transit}</span> <span style="color:#dc2626;">→</span></span>`
+                    : '<span class="zero-val">—</span>';
+                
+                html += `<tr class="day-row ${isToday ? 'today' : ''} ${isWeekend ? 'weekend' : ''}">
+                    <td><span style="display:inline-block;width:18px"></span> <span class="day-name">${DAY_NAMES[dow]}</span> ${d.date}</td>
+                    <td>${daysBadge(bDays)}</td>
+                    <td>${v(d.shipped)}</td>
+                    <td>${v(d.completed)}</td>
+                    <td>${v(d.rejected)}</td>
+                    <td><span class="transit-val">${d.in_transit}</span></td>
+                    <td style="border-left:2px solid #d1d5db;">${d.shipped > 0 ? rateBadge(accRate, false) : '<span class="zero-val">—</span>'}</td>
+                    <td style="text-align:center">${d.in_transit > 0 && d.shipped > 0
+                        ? `<span style="font-size:12px;"><span style="color:#16a34a;">←</span> <strong>${d.in_transit}</strong> <span style="color:#dc2626;">→</span></span><br><span class="rate-badge" style="background:#e0e7ff;color:#3730a3;font-size:10px;">${transitRate.toFixed(1)}%</span>`
+                        : '<span class="zero-val">—</span>'}</td>
+                    <td style="text-align:left">${d.shipped > 0 ? rateBadge(rejRate, true) : '<span class="zero-val">—</span>'}</td>
+                </tr>`;
+            }
+            
+            // Totals row
+            const totShipped = allDates.reduce((s,d) => s + d.shipped, 0);
+            const totCompleted = allDates.reduce((s,d) => s + d.completed, 0);
+            const totRejected = allDates.reduce((s,d) => s + d.rejected, 0);
+            const totTransit = allDates.reduce((s,d) => s + d.in_transit, 0);
+            const totAccRate = totShipped > 0 ? (totCompleted / totShipped * 100) : 0;
+            const totRejRate = totShipped > 0 ? (totRejected / totShipped * 100) : 0;
+            const totTransitRate = totShipped > 0 ? (totTransit / totShipped * 100) : 0;
+            
+            html += `</tbody><tfoot><tr style="font-weight:800;border-top:2px solid #374151;background:#f3f4f6;">
+                <td style="text-align:left">SKUPAJ</td>
+                <td></td>
+                <td>${totShipped}</td>
+                <td>${totCompleted}</td>
+                <td>${totRejected}</td>
+                <td><span class="transit-val">${totTransit}</span></td>
+                <td style="border-left:2px solid #d1d5db;">${rateBadge(totAccRate, false)}</td>
+                <td style="text-align:center"><span style="font-size:12px;"><span style="color:#16a34a;">←</span> <strong>${totTransit}</strong> <span style="color:#dc2626;">→</span></span><br><span class="rate-badge" style="background:#e0e7ff;color:#3730a3;font-size:10px;">${totTransitRate.toFixed(1)}%</span></td>
+                <td style="text-align:left">${rateBadge(totRejRate, true)}</td>
+            </tr></tfoot></table>`;
+            document.getElementById('reportContent').innerHTML = html;
+        }
+        
+        function toggleDetail(rowId) {
+            const detailRow = document.getElementById('detail_' + rowId);
+            const icon = document.getElementById('icon_' + rowId);
+            if (!detailRow) return;
+            if (detailRow.classList.contains('open')) {
+                detailRow.classList.remove('open');
+                icon.classList.remove('open');
+            } else {
+                detailRow.classList.add('open');
+                icon.classList.add('open');
+            }
+        }
+        
+        // Day group toggle
+        function toggleDayGroup(groupId) {
+            const content = document.getElementById(groupId);
+            const toggle = document.getElementById('toggle-' + groupId);
+            if (!content) return;
+            content.classList.toggle('collapsed');
+            toggle.classList.toggle('collapsed');
+        }
+        
+        // Save note for order
+        async function saveNoteBtn(orderId, btn) {
+            const textarea = document.getElementById('note-' + orderId);
+            if (!textarea) return;
+            const note = textarea.value;
+            btn.textContent = '⏳ Shranjujem...';
+            await saveNote(orderId, note);
+            btn.textContent = '✅ Shranjeno';
+            btn.classList.add('saved');
+            setTimeout(() => { btn.textContent = '💾 Shrani'; btn.classList.remove('saved'); }, 1500);
+        }
+
+        async function saveNote(orderId, note) {
+            try {
+                await fetch('/dashboard/api/cs-notes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ orderId, note })
+                });
+                if (!csNotesData[orderId]) csNotesData[orderId] = {};
+                csNotesData[orderId].note = note;
+            } catch (e) { console.error('Save note error:', e); }
+        }
+        
+        // Toggle done for order
+        async function toggleDone(orderId, btn) {
+            const isDone = !csNotesData[orderId]?.done;
+            try {
+                await fetch('/dashboard/api/cs-notes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ orderId, done: isDone })
+                });
+                if (!csNotesData[orderId]) csNotesData[orderId] = {};
+                csNotesData[orderId].done = isDone;
+                btn.classList.toggle('is-done', isDone);
+                btn.textContent = isDone ? '✅ Urejeno' : '☐ Označi urejeno';
+                const card = document.getElementById('card-' + orderId);
+                if (card) card.classList.toggle('is-done', isDone);
+            } catch (e) { console.error('Toggle done error:', e); }
+        }
+        
+        async function init() {
+            try {
+                // Load CS notes
+                try {
+                    const notesRes = await fetch('/dashboard/api/cs-notes');
+                    csNotesData = await notesRes.json();
+                } catch (e) { csNotesData = {}; }
+                
+                const res = await fetch('/dashboard/rejection-data.json?t=' + Date.now());
+                rejectionData = await res.json();
+                
+                if (rejectionData.generated_at) {
+                    const ago = Math.round((Date.now() - new Date(rejectionData.generated_at).getTime()) / 60000);
+                    const totalOrders = (rejectionData.in_transit_orders || []).length;
+                    const csCount = (rejectionData.in_transit_orders || []).filter(o => {
+                        if (isFreshOrder(o)) return false;
+                        const sub = getSubCategory(o);
+                        return sub === 'transit_3plus' || sub === 'paketomat' || sub === 'posta';
+                    }).length;
+                    document.getElementById('dataInfo').textContent = `Podatki generirani: ${ago < 60 ? ago + ' min nazaj' : Math.round(ago/60) + 'h nazaj'} · ${totalOrders} naročil v tranzitu · ${csCount} zahteva CS akcijo`;
+                }
+                
+                renderTabs();
+                renderSubTabs();
+                renderCsOrders();
+                renderReport();
+            } catch (e) {
+                document.getElementById('reportContent').innerHTML = '<p style="color:red;">Error loading data: ' + e.message + '</p>';
+            }
+        }
+        
+        init();
+    </script>
+</body>
+</html>

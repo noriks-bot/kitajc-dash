@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Users - Noriks Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .users-table { width: 100%; border-collapse: collapse; }
+        .users-table th, .users-table td { padding: 10px 16px; text-align: left; border-bottom: 1px solid var(--border-color); }
+        .users-table th { font-size: 12px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; }
+        .users-table td { font-size: 14px; }
+        .role-badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .role-admin { background: #dbeafe; color: #1e40af; }
+        .role-advertiser { background: #fef3c7; color: #92400e; }
+        .role-warehouse { background: #d1fae5; color: #065f46; }
+        .btn { padding: 6px 14px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; }
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-danger { background: #ef4444; color: #fff; }
+        .btn-sm { padding: 4px 10px; font-size: 12px; }
+        .btn:hover { opacity: 0.9; }
+        .form-row { display: flex; gap: 10px; margin-bottom: 16px; align-items: end; flex-wrap: wrap; }
+        .form-group { display: flex; flex-direction: column; gap: 4px; }
+        .form-group label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+        .form-group input, .form-group select { padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; }
+        .msg { padding: 8px 14px; border-radius: 6px; margin-bottom: 12px; font-size: 13px; display: none; }
+        .msg-ok { background: #d1fae5; color: #065f46; }
+        .msg-err { background: #fee2e2; color: #991b1b; }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <div class="sidebar"></div>
+        <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+        <div class="main">
+            <div class="topbar">
+                <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+                <h1 class="page-title">👥 Users</h1>
+            </div>
+            <div class="content">
+                <div class="table-card" style="margin-bottom:24px;">
+                    <div class="table-title">Add User</div>
+                    <div id="msg" class="msg"></div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Username</label>
+                            <input type="text" id="newUser" placeholder="username">
+                        </div>
+                        <div class="form-group">
+                            <label>Password</label>
+                            <input type="password" id="newPass" placeholder="password">
+                        </div>
+                        <div class="form-group">
+                            <label>Role</label>
+                            <select id="newRole">
+                                <option value="admin">Admin</option>
+                                <option value="advertiser">Advertiser</option>
+                                <option value="warehouse">Warehouse</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" onclick="addUser()">Add User</button>
+                    </div>
+                </div>
+                <div class="table-card">
+                    <div class="table-title">All Users</div>
+                    <table class="users-table">
+                        <thead><tr><th>Username</th><th>Role</th><th>Created</th><th>Actions</th></tr></thead>
+                        <tbody id="userList"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="sidebar.js"></script>
+    <script>
+        renderSidebar('users');
+
+        function showMsg(text, ok) {
+            const el = document.getElementById('msg');
+            el.textContent = text;
+            el.className = 'msg ' + (ok ? 'msg-ok' : 'msg-err');
+            el.style.display = 'block';
+            setTimeout(() => el.style.display = 'none', 3000);
+        }
+
+        async function loadUsers() {
+            const res = await fetch('/dashboard/api/users');
+            if (!res.ok) { showMsg('Failed to load users', false); return; }
+            const data = await res.json();
+            const tbody = document.getElementById('userList');
+            tbody.innerHTML = data.users.map(u => `<tr>
+                <td><strong>${u.username}</strong></td>
+                <td><span class="role-badge role-${u.role}">${u.role.toUpperCase()}</span></td>
+                <td>${u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}</td>
+                <td>
+                    <select onchange="changeRole('${u.username}', this.value)" style="padding:4px 8px;border-radius:4px;border:1px solid #ddd;font-size:12px;">
+                        <option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>
+                        <option value="advertiser" ${u.role==='advertiser'?'selected':''}>Advertiser</option>
+                        <option value="warehouse" ${u.role==='warehouse'?'selected':''}>Warehouse</option>
+                    </select>
+                    <button class="btn btn-danger btn-sm" onclick="deleteUser('${u.username}')" style="margin-left:8px;">Delete</button>
+                </td>
+            </tr>`).join('');
+        }
+
+        async function addUser() {
+            const username = document.getElementById('newUser').value.trim();
+            const password = document.getElementById('newPass').value;
+            const role = document.getElementById('newRole').value;
+            if (!username || !password) { showMsg('Username and password required', false); return; }
+            const res = await fetch('/dashboard/api/users', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({username, password, role}) });
+            const data = await res.json();
+            if (res.ok) { showMsg('User added', true); document.getElementById('newUser').value = ''; document.getElementById('newPass').value = ''; loadUsers(); }
+            else showMsg(data.error || 'Failed', false);
+        }
+
+        async function changeRole(username, role) {
+            const res = await fetch('/dashboard/api/users', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({username, role}) });
+            if (res.ok) showMsg('Role updated', true);
+            else showMsg('Failed', false);
+        }
+
+        async function deleteUser(username) {
+            if (!confirm('Delete user ' + username + '?')) return;
+            const res = await fetch('/dashboard/api/users', { method: 'DELETE', headers: {'Content-Type':'application/json'}, body: JSON.stringify({username}) });
+            const data = await res.json();
+            if (res.ok) { showMsg('User deleted', true); loadUsers(); }
+            else showMsg(data.error || 'Failed', false);
+        }
+
+        loadUsers();
+    </script>
+</body>
+</html>

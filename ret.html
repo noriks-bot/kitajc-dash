@@ -1,0 +1,631 @@
+<!-- v2026021910425 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retention Report - Noriks Analytics</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/dashboard/styles.css?v=20260224b">
+    <style>
+        .metrics-row {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+        @media (max-width: 1400px) { .metrics-row { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 900px) { .metrics-row { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 600px) { .metrics-row { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <aside class="sidebar"></aside>
+    
+    <main class="main">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+                <h1 class="page-title">🔄 Retention Report</h1>
+            </div>
+            <div class="topbar-right">
+                <button class="theme-toggle" onclick="toggleTheme()">
+                    <span id="themeIcon">🌙</span>
+                    <span id="themeText">Dark</span>
+                </button>
+                <div class="status-badge">
+                    <span class="status-dot"></span>
+                    <span id="lastUpdated">Live</span>
+                </div>
+            </div>
+        </header>
+        
+        <div class="content">
+            <div class="data-info-banner">
+                <div class="info-left">
+                    <span class="info-icon">📡</span>
+                    <div class="info-text">
+                        <strong>Data Source:</strong> WooCommerce + Meta Ads
+                        <span class="info-sep">•</span>
+                        <strong>Last Sync:</strong> <span id="lastSyncTime">—</span>
+                    </div>
+                </div>
+                <span class="info-badge" id="dataRange">—</span>
+            </div>
+            
+            <div class="filters-section">
+                <div class="filters-left">
+                    <div class="filter-group">
+                        <span class="filter-label">Period</span>
+                        <div class="preset-tabs">
+                            <button class="preset-tab" onclick="setDay('yesterday')" id="btn-yesterday">Yesterday</button>
+                            <button class="preset-tab" onclick="setPreset(7)" id="btn-7d">7D</button>
+                            <button class="preset-tab" onclick="setPreset(14)" id="btn-14d">14D</button>
+                            <button class="preset-tab" onclick="setPreset(30)" id="btn-30d">30D</button>
+                            <button class="preset-tab" onclick="setMonth('current')" id="btn-month">This Month</button>
+                            <button class="preset-tab" onclick="setMonth('last')" id="btn-lastmonth">Last Month</button>
+                            <button class="preset-tab" onclick="setYear()" id="btn-year">2026</button>
+                        </div>
+                    </div>
+                    <div class="filter-group">
+                        <span class="filter-label">Range</span>
+                        <div class="date-range">
+                            <input type="date" id="startDate" class="date-input">
+                            <span class="date-sep">→</span>
+                            <input type="date" id="endDate" class="date-input">
+                        </div>
+                    </div>
+                </div>
+                <button id="loadBtn" class="btn btn-primary" onclick="loadData()">Apply</button>
+            </div>
+            
+            <div id="error" class="error" style="display: none;"><span>⚠️</span><span id="errorText"></span></div>
+            
+            <div class="metrics-row">
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">👥</div></div>
+                    <div class="metric-label">Returning Customers</div>
+                    <div class="metric-value text-cyan" id="totalRetCustomers">—</div>
+                    <div class="metric-sub">Unique customers</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">📦</div></div>
+                    <div class="metric-label">Repeat Orders</div>
+                    <div class="metric-value text-primary" id="totalRetOrders">—</div>
+                    <div class="metric-sub" id="ordersPerCustomer">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">💰</div></div>
+                    <div class="metric-label">Retention Revenue</div>
+                    <div class="metric-value text-green" id="totalRevenue">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">📊</div></div>
+                    <div class="metric-label">Avg Order Value</div>
+                    <div class="metric-value text-cyan" id="totalAOV">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">📈</div></div>
+                    <div class="metric-label">Retention Rate</div>
+                    <div class="metric-value" id="totalRate">—</div>
+                    <div class="metric-sub" id="totalRatio"></div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">💵</div></div>
+                    <div class="metric-label">Profit (Ret)</div>
+                    <div class="metric-value" id="totalProfit">—</div>
+                    <div class="metric-sub">No acquisition cost</div>
+                </div>
+            </div>
+            
+            <div class="country-summary" id="countryGrid">
+                <div class="country-card hr">
+                    <div class="country-header">
+                        <div class="country-info">
+                            <span class="country-flag">🇭🇷</span>
+                            <span class="country-name">Croatia</span>
+                        </div>
+                    </div>
+                    <div class="country-stats">
+                        <div class="country-stat">
+                            <div class="country-stat-value text-primary" id="hr-ret">—</div>
+                            <div class="country-stat-label">Orders</div>
+                        </div>
+                        <div class="country-stat">
+                            <div class="country-stat-value text-green" id="hr-revenue">—</div>
+                            <div class="country-stat-label">Revenue</div>
+                        </div>
+                        <div class="country-stat">
+                            <div class="country-stat-value text-cyan" id="hr-aov">—</div>
+                            <div class="country-stat-label">AOV</div>
+                        </div>
+                        <div class="country-stat">
+                            <div class="country-stat-value" id="hr-rate">—</div>
+                            <div class="country-stat-label">Ret Rate</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="country-card cz">
+                    <div class="country-header">
+                        <div class="country-info">
+                            <span class="country-flag">🇨🇿</span>
+                            <span class="country-name">Czech Republic</span>
+                        </div>
+                    </div>
+                    <div class="country-stats">
+                        <div class="country-stat">
+                            <div class="country-stat-value text-primary" id="cz-ret">—</div>
+                            <div class="country-stat-label">Orders</div>
+                        </div>
+                        <div class="country-stat">
+                            <div class="country-stat-value text-green" id="cz-revenue">—</div>
+                            <div class="country-stat-label">Revenue</div>
+                        </div>
+                        <div class="country-stat">
+                            <div class="country-stat-value text-cyan" id="cz-aov">—</div>
+                            <div class="country-stat-label">AOV</div>
+                        </div>
+                        <div class="country-stat">
+                            <div class="country-stat-value" id="cz-rate">—</div>
+                            <div class="country-stat-label">Ret Rate</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="country-card pl">
+                    <div class="country-header">
+                        <div class="country-info">
+                            <span class="country-flag">🇵🇱</span>
+                            <span class="country-name">Poland</span>
+                        </div>
+                    </div>
+                    <div class="country-stats">
+                        <div class="country-stat">
+                            <div class="country-stat-value text-primary" id="pl-ret">—</div>
+                            <div class="country-stat-label">Orders</div>
+                        </div>
+                        <div class="country-stat">
+                            <div class="country-stat-value text-green" id="pl-revenue">—</div>
+                            <div class="country-stat-label">Revenue</div>
+                        </div>
+                        <div class="country-stat">
+                            <div class="country-stat-value text-cyan" id="pl-aov">—</div>
+                            <div class="country-stat-label">AOV</div>
+                        </div>
+                        <div class="country-stat">
+                            <div class="country-stat-value" id="pl-rate">—</div>
+                            <div class="country-stat-label">Ret Rate</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="country-card gr">
+                    <div class="country-header">
+                        <div class="country-info">
+                            <span class="country-flag">🇬🇷</span>
+                            <span class="country-name">Greece</span>
+                        </div>
+                    </div>
+                    <div class="country-stats">
+                        <div class="country-stat">
+                            <div class="country-stat-value text-primary" id="gr-ret">—</div>
+                            <div class="country-stat-label">Orders</div>
+                        </div>
+                        <div class="country-stat">
+                            <div class="country-stat-value text-green" id="gr-revenue">—</div>
+                            <div class="country-stat-label">Revenue</div>
+                        </div>
+                        <div class="country-stat">
+                            <div class="country-stat-value text-cyan" id="gr-aov">—</div>
+                            <div class="country-stat-label">AOV</div>
+                        </div>
+                        <div class="country-stat">
+                            <div class="country-stat-value" id="gr-rate">—</div>
+                            <div class="country-stat-label">Ret Rate</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="country-card sk">
+                    <div class="country-header">
+                        <div class="country-info">
+                            <span class="country-flag">🇸🇰</span>
+                            <span class="country-name">Slovakia</span>
+                        </div>
+                    </div>
+                    <div class="country-stats">
+                        <div class="country-stat">
+                            <div class="country-stat-value text-primary" id="sk-ret">—</div>
+                            <div class="country-stat-label">Orders</div>
+                        </div>
+                        <div class="country-stat">
+                            <div class="country-stat-value text-green" id="sk-revenue">—</div>
+                            <div class="country-stat-label">Revenue</div>
+                        </div>
+                        <div class="country-stat">
+                            <div class="country-stat-value text-cyan" id="sk-aov">—</div>
+                            <div class="country-stat-label">AOV</div>
+                        </div>
+                        <div class="country-stat">
+                            <div class="country-stat-value" id="sk-rate">—</div>
+                            <div class="country-stat-label">Ret Rate</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="country-card it">
+                    <div class="country-header">
+                        <div class="country-info">
+                            <span class="country-flag">🇮🇹</span>
+                            <span class="country-name">Italy</span>
+                        </div>
+                    </div>
+                    <div class="country-stats">
+                        <div class="country-stat">
+                            <div class="country-stat-value text-primary" id="it-ret">—</div>
+                            <div class="country-stat-label">Orders</div>
+                        </div>
+                        <div class="country-stat">
+                            <div class="country-stat-value text-green" id="it-revenue">—</div>
+                            <div class="country-stat-label">Revenue</div>
+                        </div>
+                        <div class="country-stat">
+                            <div class="country-stat-value text-cyan" id="it-aov">—</div>
+                            <div class="country-stat-label">AOV</div>
+                        </div>
+                        <div class="country-stat">
+                            <div class="country-stat-value" id="it-rate">—</div>
+                            <div class="country-stat-label">Ret Rate</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="country-card hu">
+                    <div class="country-header">
+                        <div class="country-info">
+                            <span class="country-flag">🇭🇺</span>
+                            <span class="country-name">Hungary</span>
+                        </div>
+                    </div>
+                    <div class="country-stats">
+                        <div class="country-stat">
+                            <div class="country-stat-value text-primary" id="hu-ret">—</div>
+                            <div class="country-stat-label">Orders</div>
+                        </div>
+                        <div class="country-stat">
+                            <div class="country-stat-value text-green" id="hu-revenue">—</div>
+                            <div class="country-stat-label">Revenue</div>
+                        </div>
+                        <div class="country-stat">
+                            <div class="country-stat-value text-cyan" id="hu-aov">—</div>
+                            <div class="country-stat-label">AOV</div>
+                        </div>
+                        <div class="country-stat">
+                            <div class="country-stat-value" id="hu-rate">—</div>
+                            <div class="country-stat-label">Ret Rate</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">
+                        <span class="chart-icon">📈</span>
+                        Returning Orders per Day
+                    </div>
+                </div>
+                <canvas id="retChart" height="200"></canvas>
+            </div>
+            
+            <div class="table-card">
+                <div class="table-header">
+                    <div class="table-title">📋 Daily Retention Data</div>
+                </div>
+                <div class="table-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Ret Orders</th>
+                                <th>Total Orders</th>
+                                <th>Ret Rate</th>
+                                <th>Revenue</th>
+                                <th>AOV</th>
+                                <th>Profit (Ret)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <tr><td colspan="7" class="loading"><span class="spinner"></span> Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <script>
+        // Theme toggle
+        function toggleTheme() {
+            const html = document.documentElement;
+            const current = html.getAttribute('data-theme');
+            const newTheme = current === 'light' ? 'dark' : 'light';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeUI(newTheme);
+        }
+        
+        function updateThemeUI(theme) {
+            document.getElementById('themeIcon').textContent = theme === 'light' ? '☀️' : '🌙';
+            document.getElementById('themeText').textContent = theme === 'light' ? 'Light' : 'Dark';
+        }
+        
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        updateThemeUI(savedTheme);
+        
+        function toggleSidebar() {
+
+        function toggleCollapse() {
+            const sidebar = document.querySelector(".sidebar");
+            const btn = document.querySelector(".collapse-btn");
+            sidebar.classList.toggle("collapsed");
+            const isCollapsed = sidebar.classList.contains("collapsed");
+            btn.querySelector(".collapse-text").textContent = isCollapsed ? "Show" : "Hide Menu";
+            btn.querySelector(".collapse-icon").textContent = isCollapsed ? "▶" : "◀";
+            localStorage.setItem("sidebarCollapsed", isCollapsed);
+        }
+
+        // Load saved collapse state
+        if (localStorage.getItem("sidebarCollapsed") === "true") {
+            document.querySelector(".sidebar").classList.add("collapsed");
+            const collapseText = document.querySelector(".collapse-text");
+            const collapseIcon = document.querySelector(".collapse-icon");
+            if (collapseText) collapseText.textContent = "Show";
+            if (collapseIcon) collapseIcon.textContent = "▶";
+        }
+            document.querySelector('.sidebar').classList.toggle('open');
+            document.querySelector('.sidebar-overlay').classList.toggle('open');
+        }
+        
+        const colors = { HR: '#ff6b6b', CZ: '#2ecc71', PL: '#feca57', GR: '#3498db', SK: '#9b59b6', IT: '#e74c3c', HU: '#1abc9c' };
+        let chart = null;
+        
+        function formatDate(d) {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        
+        function updateActiveTab(id) {
+            document.querySelectorAll('.preset-tab').forEach(t => t.classList.remove('active'));
+            const tab = document.getElementById('btn-' + id);
+            if (tab) tab.classList.add('active');
+        }
+        
+        function setPreset(days) {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const start = new Date(yesterday);
+            start.setDate(start.getDate() - (days - 1));
+            document.getElementById('startDate').value = formatDate(start);
+            document.getElementById('endDate').value = formatDate(yesterday);
+            updateActiveTab(days + 'd');
+            loadData();
+        }
+        
+        function setDay(which) {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            document.getElementById('startDate').value = formatDate(yesterday);
+            document.getElementById('endDate').value = formatDate(yesterday);
+            updateActiveTab(which);
+            loadData();
+        }
+        
+        function setMonth(which) {
+            const now = new Date();
+            let start, end;
+            if (which === 'current') {
+                start = new Date(now.getFullYear(), now.getMonth(), 1);
+                end = now;
+                updateActiveTab('month');
+            } else {
+                start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                end = new Date(now.getFullYear(), now.getMonth(), 0);
+                updateActiveTab('lastmonth');
+            }
+            document.getElementById('startDate').value = formatDate(start);
+            document.getElementById('endDate').value = formatDate(end);
+            loadData();
+        }
+        
+        function setYear() {
+            const now = new Date();
+            const start = new Date(2026, 0, 1);
+            document.getElementById('startDate').value = formatDate(start);
+            document.getElementById('endDate').value = formatDate(now);
+            updateActiveTab('year');
+            loadData();
+        }
+        
+        setPreset(7);
+        
+        async function loadData() {
+            const btn = document.getElementById('loadBtn');
+            const errorDiv = document.getElementById('error');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;margin:0;"></span>';
+            errorDiv.style.display = 'none';
+            
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            
+            try {
+                const res = await fetch(`/dashboard/api/data?start=${start}&end=${end}`);
+                if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                if (!data.countries || !data.dates) throw new Error('Invalid data format');
+                
+                renderData(data);
+                
+                if (data.lastUpdate) {
+                    const updated = new Date(data.lastUpdate);
+                    const mins = Math.floor((new Date() - updated) / 60000);
+                    document.getElementById('lastUpdated').textContent = mins < 1 ? 'Just now' : mins + 'm ago';
+                    document.getElementById('lastSyncTime').textContent = updated.toLocaleString();
+                }
+                
+                if (data.dates && data.dates.length > 0) {
+                    document.getElementById('dataRange').textContent = `${data.dates[0]} → ${data.dates[data.dates.length - 1]} (${data.dates.length} days)`;
+                }
+            } catch (e) {
+                document.getElementById('errorText').textContent = e.message;
+                errorDiv.style.display = 'flex';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Apply';
+            }
+        }
+        
+        function renderData(data) {
+            const countryTotals = {};
+            for (const c of data.countries) countryTotals[c] = { ret: 0, retOrders: 0, orders: 0, retRevenue: 0, totalCost: 0 };
+            
+            let totalRetCustomers = 0, totalRetOrders = 0, totalOrders = 0, totalRetRevenue = 0, totalRetCost = 0;
+            
+            for (const date of data.dates) {
+                for (const country of data.countries) {
+                    const d = data.data[date]?.[country];
+                    if (d) {
+                        countryTotals[country].ret += d.returning || 0;
+                        countryTotals[country].retOrders += d.ret_orders || 0;
+                        countryTotals[country].orders += d.orders || 0;
+                        countryTotals[country].retRevenue += d.ret_revenue_eur || 0;
+                        
+                        totalRetCustomers += d.returning || 0;
+                        totalRetOrders += d.ret_orders || 0;
+                        totalOrders += d.orders || 0;
+                        totalRetRevenue += d.ret_revenue_eur || 0;
+                        // Include both product cost and shipping cost
+                        const costPerOrder = d.orders > 0 ? ((d.product_cost || 0) + (d.shipping_cost || 0)) / d.orders : 0;
+                        const retCost = costPerOrder * (d.ret_orders || 0);
+                        countryTotals[country].totalCost += retCost;
+                        totalRetCost += retCost;
+                    }
+                }
+            }
+            
+            const totalNewOrders = totalOrders - totalRetOrders;
+            const retRate = totalOrders > 0 ? (totalRetOrders / totalOrders * 100) : 0;
+            const aov = totalRetOrders > 0 ? totalRetRevenue / totalRetOrders : 0;
+            const ordersPerCust = totalRetCustomers > 0 ? (totalRetOrders / totalRetCustomers).toFixed(2) : 0;
+            
+            document.getElementById('totalRetCustomers').textContent = totalRetCustomers.toLocaleString();
+            document.getElementById('totalRetOrders').textContent = totalRetOrders.toLocaleString();
+            document.getElementById('ordersPerCustomer').textContent = `${ordersPerCust} orders/customer`;
+            document.getElementById('totalRevenue').textContent = '€' + totalRetRevenue.toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('totalAOV').textContent = totalRetOrders > 0 ? '€' + aov.toFixed(2) : '—';
+            
+            const rateEl = document.getElementById('totalRate');
+            rateEl.textContent = retRate.toFixed(1) + '%';
+            rateEl.className = 'metric-value ' + (retRate >= 30 ? 'text-green' : retRate >= 15 ? 'text-amber' : 'text-red');
+            
+            document.getElementById('totalRatio').textContent = `${totalRetOrders} ret / ${totalNewOrders} new`;
+            
+            const retProfit = totalRetRevenue - totalRetCost;
+            document.getElementById('totalProfit').textContent = '€' + retProfit.toFixed(2);
+            document.getElementById('totalProfit').className = 'metric-value ' + (retProfit >= 0 ? 'text-green' : 'text-red');
+            
+            for (const country of data.countries) {
+                const t = countryTotals[country];
+                const code = country.toLowerCase();
+                const rate = t.orders > 0 ? (t.retOrders / t.orders * 100) : 0;
+                const cAov = t.retOrders > 0 ? t.retRevenue / t.retOrders : 0;
+                
+                const retEl = document.getElementById(`${code}-ret`);
+                const revEl = document.getElementById(`${code}-revenue`);
+                const aovEl = document.getElementById(`${code}-aov`);
+                const rateEl = document.getElementById(`${code}-rate`);
+                
+                if (retEl) retEl.textContent = t.retOrders.toLocaleString();
+                if (revEl) revEl.textContent = '€' + Math.round(t.retRevenue).toLocaleString();
+                if (aovEl) aovEl.textContent = t.retOrders > 0 ? '€' + cAov.toFixed(0) : '—';
+                if (rateEl) {
+                    rateEl.textContent = rate.toFixed(1) + '%';
+                    rateEl.className = 'country-stat-value ' + (rate >= 30 ? 'text-green' : rate >= 15 ? 'text-amber' : 'text-red');
+                }
+            }
+            
+            const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+            if (chart) chart.destroy();
+            chart = new Chart(document.getElementById('retChart'), {
+                type: 'bar',
+                data: {
+                    labels: data.dates,
+                    datasets: data.countries.map(c => ({
+                        label: c,
+                        data: data.dates.map(d => data.data[d]?.[c]?.ret_orders || 0),
+                        backgroundColor: colors[c],
+                        borderRadius: 4
+                    }))
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { labels: { color: isDark ? '#888899' : '#6a6a7a', usePointStyle: true, padding: 14 } }
+                    },
+                    scales: {
+                        x: { stacked: true, ticks: { color: isDark ? '#666677' : '#8a8a9a' }, grid: { color: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' } },
+                        y: { stacked: true, ticks: { color: isDark ? '#666677' : '#8a8a9a' }, grid: { color: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' } }
+                    }
+                }
+            });
+            
+            let html = '';
+            for (const date of [...data.dates].reverse()) {
+                let retOrders = 0, orders = 0, retRevenue = 0, effectiveProductCost = 0, shippingCost = 0;
+                
+                for (const country of data.countries) {
+                    const d = data.data[date]?.[country];
+                    if (!d) continue;
+                    retOrders += d.ret_orders || 0;
+                    orders += d.orders || 0;
+                    retRevenue += d.ret_revenue_eur || 0;
+                    // Use effective_product_cost (adjusted for rejection rate) for consistency
+                    effectiveProductCost += d.effective_product_cost || d.product_cost || 0;
+                    shippingCost += d.shipping_cost || 0;
+                }
+                
+                if (retOrders === 0) continue;
+                
+                const rate = orders > 0 ? (retOrders / orders * 100) : 0;
+                const aov = retOrders > 0 ? retRevenue / retOrders : 0;
+                // Pro-rate effective product cost + shipping to returning orders
+                const retTotalCost = orders > 0 ? ((effectiveProductCost + shippingCost) / orders) * retOrders : 0;
+                const profit = retRevenue - retTotalCost;
+                
+                const rateBadge = rate >= 30 ? 'badge-green' : rate >= 15 ? 'badge-amber' : 'badge-red';
+                const profitClass = profit >= 0 ? 'text-green' : 'text-red';
+                
+                html += `<tr>
+                    <td><strong>${date}</strong></td>
+                    <td class="text-cyan" style="font-weight: 700;">${retOrders}</td>
+                    <td>${orders}</td>
+                    <td><span class="badge ${rateBadge}">${rate.toFixed(1)}%</span></td>
+                    <td class="text-green">€${retRevenue.toFixed(2)}</td>
+                    <td class="text-cyan">€${aov.toFixed(2)}</td>
+                    <td class="${profitClass}" style="font-weight: 600;">€${profit.toFixed(2)}</td>
+                </tr>`;
+            }
+            document.getElementById('tableBody').innerHTML = html || '<tr><td colspan="7" class="loading">No data</td></tr>';
+        }
+        
+        async function logout() {
+            await fetch('/dashboard/api/logout');
+            window.location.href = '/dashboard/login';
+        }
+    </script>
+<script src="/dashboard/sidebar.js"></script>
+    <script>renderSidebar('ret');</script>
+</body>
+</html>

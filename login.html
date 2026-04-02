@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Noriks Analytics</title>
+    <link rel="stylesheet" href="/dashboard/styles.css?v=20260224b">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+            background: var(--content-bg);
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <h1>Noriks Analytics</h1>
+            <p>Sign in to continue</p>
+        </div>
+        
+        <div class="error-message" id="error"></div>
+        
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" placeholder="Enter username" autocomplete="username" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="Enter password" autocomplete="current-password" required>
+            </div>
+            
+            <button type="submit" class="submit-btn" id="submitBtn">Sign In</button>
+        </form>
+    </div>
+    
+    <script>
+        const form = document.getElementById('loginForm');
+        const errorEl = document.getElementById('error');
+        const submitBtn = document.getElementById('submitBtn');
+        
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Signing in...';
+            errorEl.style.display = 'none';
+            
+            try {
+                const res = await fetch('/dashboard/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await res.json();
+                
+                if (data.ok) {
+                    const params = new URLSearchParams(window.location.search);
+                    const redirect = params.get('redirect');
+                    // Role-based redirect after login
+                    if (data.role === 'advertiser') {
+                        window.location.href = redirect || '/dashboard/advertiser.html';
+                    } else if (data.role === 'warehouse') {
+                        window.location.href = redirect || '/dashboard/stock-report.html';
+                    } else {
+                        window.location.href = redirect || '/dashboard/';
+                    };
+                } else {
+                    errorEl.textContent = data.error || 'Invalid credentials';
+                    errorEl.style.display = 'block';
+                }
+            } catch (err) {
+                errorEl.textContent = 'Connection error. Please try again.';
+                errorEl.style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Sign In';
+            }
+        });
+        
+        document.getElementById('username').focus();
+    </script>
+</body>
+</html>

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shipping Costs - Noriks Analytics</title>
+    <link rel="stylesheet" href="/dashboard/styles.css?v=20260224b">
+</head>
+<body>
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <aside class="sidebar"></aside>
+    
+    <main class="main">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+                <h1 class="page-title">🚚 Shipping Costs</h1>
+            </div>
+            <div class="topbar-right">
+                <button class="theme-toggle" onclick="toggleTheme()">
+                    <span id="themeIcon">🌙</span>
+                    <span id="themeText">Dark</span>
+                </button>
+            </div>
+        </header>
+        
+        <div class="content" style="max-width: 800px;">
+            <div class="info-card">
+                <p class="info-text" style="color: var(--text-secondary); font-size: 14px;">
+                    Configure shipping costs per country. These values are used in profit calculations.
+                </p>
+            </div>
+            
+            <div id="status-message" class="status-message"></div>
+            
+            <div class="table-card">
+                <div id="content">
+                    <div class="loading"><span class="spinner"></span> Loading...</div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 24px; display: flex; justify-content: flex-end;">
+                <button class="btn btn-primary" id="save-btn" onclick="saveSettings()">
+                    💾 Save Changes
+                </button>
+            </div>
+        </div>
+    </main>
+    
+    <script>
+        // Theme toggle
+        function toggleTheme() {
+            const html = document.documentElement;
+            const current = html.getAttribute('data-theme');
+            const newTheme = current === 'light' ? 'dark' : 'light';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeUI(newTheme);
+        }
+        
+        function updateThemeUI(theme) {
+            document.getElementById('themeIcon').textContent = theme === 'light' ? '☀️' : '🌙';
+            document.getElementById('themeText').textContent = theme === 'light' ? 'Light' : 'Dark';
+        }
+        
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        updateThemeUI(savedTheme);
+        
+        const COUNTRIES = [
+            { code: 'HR', name: 'Croatia', flag: '🇭🇷' },
+            { code: 'CZ', name: 'Czech Republic', flag: '🇨🇿' },
+            { code: 'PL', name: 'Poland', flag: '🇵🇱' },
+            { code: 'SK', name: 'Slovakia', flag: '🇸🇰' },
+            { code: 'HU', name: 'Hungary', flag: '🇭🇺' },
+            { code: 'GR', name: 'Greece', flag: '🇬🇷' },
+            { code: 'IT', name: 'Italy', flag: '🇮🇹' }
+        ];
+        
+        let currentSettings = {};
+        
+        function toggleSidebar() {
+
+        function toggleCollapse() {
+            const sidebar = document.querySelector(".sidebar");
+            const btn = document.querySelector(".collapse-btn");
+            sidebar.classList.toggle("collapsed");
+            const isCollapsed = sidebar.classList.contains("collapsed");
+            btn.querySelector(".collapse-text").textContent = isCollapsed ? "Show" : "Hide Menu";
+            btn.querySelector(".collapse-icon").textContent = isCollapsed ? "▶" : "◀";
+            localStorage.setItem("sidebarCollapsed", isCollapsed);
+        }
+
+        // Load saved collapse state
+        if (localStorage.getItem("sidebarCollapsed") === "true") {
+            document.querySelector(".sidebar").classList.add("collapsed");
+            const collapseText = document.querySelector(".collapse-text");
+            const collapseIcon = document.querySelector(".collapse-icon");
+            if (collapseText) collapseText.textContent = "Show";
+            if (collapseIcon) collapseIcon.textContent = "▶";
+        }
+            document.querySelector('.sidebar').classList.toggle('open');
+            document.querySelector('.sidebar-overlay').classList.toggle('open');
+        }
+        
+        async function loadSettings() {
+            try {
+                const res = await fetch('/dashboard/api/shipping');
+                const data = await res.json();
+                currentSettings = data.shipping || {};
+                renderTable();
+            } catch (e) {
+                document.getElementById('content').innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
+            }
+        }
+        
+        function renderTable() {
+            let html = `<table>
+                <thead>
+                    <tr>
+                        <th>Country</th>
+                        <th>Shipping Cost</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+            
+            for (const country of COUNTRIES) {
+                const value = currentSettings[country.code] || 0;
+                html += `
+                    <tr>
+                        <td>
+                            <span style="font-size: 24px; margin-right: 12px;">${country.flag}</span>
+                            <span style="font-weight: 600;">${country.name} (${country.code})</span>
+                        </td>
+                        <td>
+                            <input type="number" 
+                                   class="cost-input" 
+                                   style="width: 120px; text-align: right;"
+                                   id="shipping-${country.code}" 
+                                   value="${value}" 
+                                   min="0" 
+                                   step="0.01"
+                                   placeholder="0.00">
+                            <span style="color: var(--text-muted); margin-left: 8px; font-weight: 500;">€</span>
+                        </td>
+                    </tr>`;
+            }
+            
+            html += '</tbody></table>';
+            document.getElementById('content').innerHTML = html;
+        }
+        
+        async function saveSettings() {
+            const btn = document.getElementById('save-btn');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+            
+            const settings = {};
+            for (const country of COUNTRIES) {
+                const input = document.getElementById('shipping-' + country.code);
+                settings[country.code] = parseFloat(input.value) || 0;
+            }
+            
+            try {
+                const res = await fetch('/dashboard/api/shipping', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ shipping: settings })
+                });
+                const data = await res.json();
+                
+                if (data.ok) {
+                    showStatus('✅ Shipping costs saved successfully!', 'success');
+                    currentSettings = settings;
+                } else {
+                    showStatus('❌ Error: ' + (data.error || 'Unknown error'), 'error');
+                }
+            } catch (e) {
+                showStatus('❌ Error: ' + e.message, 'error');
+            }
+            
+            btn.disabled = false;
+            btn.textContent = '💾 Save Changes';
+        }
+        
+        function showStatus(message, type) {
+            const el = document.getElementById('status-message');
+            el.textContent = message;
+            el.className = 'status-message status-' + type;
+            setTimeout(() => { el.className = 'status-message'; }, 3000);
+        }
+        
+        async function logout() {
+            await fetch('/dashboard/api/logout');
+            window.location.href = '/dashboard/login';
+        }
+        
+        loadSettings();
+    </script>
+<script src="/dashboard/sidebar.js"></script>
+    <script>renderSidebar('shipping');</script>
+</body>
+</html>

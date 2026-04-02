@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shipping Speed - Noriks Analytics</title>
+    <link rel="stylesheet" href="/dashboard/styles.css?v=20260309">
+    <style>
+        .speed-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .speed-bar {
+            display: flex;
+            height: 28px;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+        .speed-bar-segment {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 600;
+            color: white;
+            min-width: 30px;
+        }
+        .speed-bar-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+        .outliers-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        .outliers-table th, .outliers-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 12px; }
+        .outliers-table th { color: var(--text-secondary); text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
+        .progress-bar-container { background: var(--content-bg); border-radius: 6px; height: 8px; margin-top: 8px; overflow: hidden; }
+        .progress-bar-fill { background: var(--primary); height: 100%; border-radius: 6px; transition: width 0.3s; }
+    </style>
+</head>
+<body>
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <aside class="sidebar"></aside>
+
+    <main class="main">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+                <h1 class="page-title">📦 Shipping Speed Report</h1>
+            </div>
+            <div class="topbar-right">
+                <button class="theme-toggle" onclick="toggleTheme()">
+                    <span id="themeIcon">🌙</span>
+                    <span id="themeText">Dark</span>
+                </button>
+                <div class="status-badge">
+                    <span class="status-dot"></span>
+                    <span id="lastUpdated">—</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="content">
+            <div class="data-info-banner">
+                <div class="info-left">
+                    <span class="info-icon">📡</span>
+                    <div class="info-text">
+                        <strong>Data Source:</strong> Metakocka Delivery Events
+                        <span class="info-sep">•</span>
+                        <strong>Period:</strong> Last 60 days
+                    </div>
+                </div>
+                <div class="info-right">
+                    <button class="btn btn-primary" id="refreshBtn" onclick="refreshData()">🔄 Refresh</button>
+                </div>
+            </div>
+
+            <div id="progressSection" style="display:none;">
+                <div class="metric-card" style="margin-bottom:20px;">
+                    <div style="display:flex;justify-content:space-between;">
+                        <span id="progressText">Fetching shipping events...</span>
+                        <span id="progressCount"></span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill" id="progressBar" style="width:0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="metricsRow" class="metrics-grid"></div>
+
+            <div id="pipelineTable"></div>
+
+            <div id="content">
+                <div class="metric-card" style="text-align:center;padding:40px;">
+                    <div class="metric-label">Loading shipping speed data...</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const FLAGS = { HR: '🇭🇷', CZ: '🇨🇿', PL: '🇵🇱', GR: '🇬🇷', IT: '🇮🇹', HU: '🇭🇺', SK: '🇸🇰' };
+        const COUNTRY_NAMES = { HR: 'Croatia', CZ: 'Czech Republic', PL: 'Poland', GR: 'Greece', IT: 'Italy', HU: 'Hungary', SK: 'Slovakia' };
+        const COLORS = {
+            order_to_ship: '#3498db',
+            ship_to_pickup: '#9b59b6',
+            pickup_to_delivery: '#e67e22',
+            delivery_to_delivered: '#27ae60',
+        };
+
+        function formatDays(hours) {
+            if (hours === null || hours === undefined || isNaN(hours)) return '—';
+            if (hours < 24) return hours.toFixed(1) + 'h';
+            return (hours / 24).toFixed(1) + 'd';
+        }
+
+        async function loadData() {
+            try {
+                const resp = await fetch('/api/shipping-speed');
+                if (!resp.ok) throw new Error('Failed');
+                const data = await resp.json();
+                renderData(data);
+            } catch (e) {
+                document.getElementById('content').innerHTML = '<div class="metric-card" style="text-align:center;padding:40px;"><div class="metric-label">No data yet. Click "Refresh" to generate.</div></div>';
+            }
+        }
+
+        async function refreshData() {
+            const btn = document.getElementById('refreshBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Generating...';
+            document.getElementById('progressSection').style.display = 'block';
+            try {
+                const resp = await fetch('/api/shipping-speed/refresh', { method: 'POST' });
+                const reader = resp.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+                    for (const line of lines) {
+                        if (!line.startsWith('data: ')) continue;
+                        try {
+                            const evt = JSON.parse(line.slice(6));
+                            if (evt.type === 'progress') {
+                                document.getElementById('progressText').textContent = evt.message || 'Processing...';
+                                document.getElementById('progressCount').textContent = evt.current + '/' + evt.total;
+                                document.getElementById('progressBar').style.width = ((evt.current / evt.total) * 100) + '%';
+                            } else if (evt.type === 'done') {
+                                document.getElementById('progressSection').style.display = 'none';
+                                renderData(evt.data);
+                            } else if (evt.type === 'error') {
+                                alert('Error: ' + evt.message);
+                            }
+                        } catch (e) {}
+                    }
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+            btn.disabled = false;
+            btn.textContent = '🔄 Refresh';
+            document.getElementById('progressSection').style.display = 'none';
+        }
+
+        function renderData(data) {
+            if (data.generated_at) {
+                document.getElementById('lastUpdated').textContent = new Date(data.generated_at).toLocaleString();
+            }
+
+            const totalOrders = data.total_orders || 0;
+            const totalDelivered = data.total_delivered || 0;
+            const totalFailed = data.total_failed || 0;
+            const avgH = data.avg_total_hours || 0;
+            const delRate = totalOrders > 0 ? ((totalDelivered / totalOrders) * 100).toFixed(1) : '0.0';
+
+            document.getElementById('metricsRow').innerHTML = `
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">📊</div></div>
+                    <div class="metric-value">${totalOrders.toLocaleString()}</div>
+                    <div class="metric-label">Orders Analyzed</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">⏱️</div></div>
+                    <div class="metric-value">${formatDays(avgH)}</div>
+                    <div class="metric-label">Avg Total Time</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">✅</div></div>
+                    <div class="metric-value" style="color:var(--success)">${totalDelivered.toLocaleString()}</div>
+                    <div class="metric-label">Delivered</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">📈</div></div>
+                    <div class="metric-value" style="color:${parseFloat(delRate) >= 90 ? 'var(--success)' : parseFloat(delRate) >= 70 ? 'var(--warning)' : 'var(--danger)'}">${delRate}%</div>
+                    <div class="metric-label">Delivery Rate</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">❌</div></div>
+                    <div class="metric-value" style="color:var(--danger)">${totalFailed.toLocaleString()}</div>
+                    <div class="metric-label">Failed / Returned</div>
+                </div>
+            `;
+
+            // Pipeline summary table
+            const countries = data.countries || [];
+            let pipeHtml = `
+            <div class="table-card" style="margin-bottom:24px;">
+                <div class="table-header">
+                    <div class="table-title">📊 Delivery Pipeline by Country</div>
+                </div>
+                <div class="table-scroll">
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>Country</th>
+                                <th>Courier</th>
+                                <th>Orders</th>
+                                <th>Order → Ship</th>
+                                <th>Ship → Courier</th>
+                                <th>Courier → Delivery</th>
+                                <th>Delivery → Done</th>
+                                <th>Courier → Done</th>
+                                <th>Total Avg</th>
+                                <th>Delivered</th>
+                                <th>Failed</th>
+                                <th>Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+
+            for (const c of countries) {
+                const flag = FLAGS[c.country_iso] || '🏳️';
+                const name = COUNTRY_NAMES[c.country_iso] || c.country_iso;
+                const cDelRate = c.orders > 0 ? ((c.delivered / c.orders) * 100).toFixed(1) : '0.0';
+                // Courier pickup → delivered = ship_to_pickup is actually ship→courier, then pickup_to_delivery + delivery_to_delivered
+                const courierToDone = (c.avg_pickup_to_delivery != null && c.avg_delivery_to_delivered != null) 
+                    ? (c.avg_pickup_to_delivery + c.avg_delivery_to_delivered) 
+                    : null;
+                const rateClass = parseFloat(cDelRate) >= 90 ? 'badge-green' : parseFloat(cDelRate) >= 70 ? 'badge-amber' : 'badge-red';
+
+                pipeHtml += `
+                            <tr>
+                                <td><strong>${flag} ${name}</strong></td>
+                                <td><span class="badge badge-blue" style="font-size:10px;">${c.courier || '—'}</span></td>
+                                <td>${c.orders}</td>
+                                <td>${formatDays(c.avg_order_to_ship)}</td>
+                                <td>${formatDays(c.avg_ship_to_pickup)}</td>
+                                <td>${formatDays(c.avg_pickup_to_delivery)}</td>
+                                <td>${formatDays(c.avg_delivery_to_delivered)}</td>
+                                <td><strong style="color:var(--warning)">${formatDays(courierToDone)}</strong></td>
+                                <td><strong>${formatDays(c.avg_total_hours)}</strong></td>
+                                <td style="color:var(--success)">${c.delivered}</td>
+                                <td style="color:var(--danger)">${c.failed}</td>
+                                <td><span class="badge ${rateClass}">${cDelRate}%</span></td>
+                            </tr>`;
+            }
+
+            pipeHtml += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+            document.getElementById('pipelineTable').innerHTML = pipeHtml;
+
+            let html = '';
+
+            for (const c of countries) {
+                const flag = FLAGS[c.country_iso] || '🏳️';
+                const name = COUNTRY_NAMES[c.country_iso] || c.country_iso;
+                const segments = [
+                    { label: 'Order→Ship', hours: c.avg_order_to_ship || 0, color: COLORS.order_to_ship },
+                    { label: 'Ship→Pickup', hours: c.avg_ship_to_pickup || 0, color: COLORS.ship_to_pickup },
+                    { label: 'Pickup→Delivery', hours: c.avg_pickup_to_delivery || 0, color: COLORS.pickup_to_delivery },
+                    { label: 'Delivery→Done', hours: c.avg_delivery_to_delivered || 0, color: COLORS.delivery_to_delivered },
+                ];
+                const segSum = segments.reduce((a, s) => a + s.hours, 0) || 1;
+                const cDelRate = c.orders > 0 ? ((c.delivered / c.orders) * 100).toFixed(1) : '0.0';
+
+                html += `
+                <div class="table-card">
+                    <div class="table-header">
+                        <div class="table-title">${flag} ${name}</div>
+                        <span class="badge badge-blue">${c.courier || '—'}</span>
+                    </div>
+                    <div style="padding:20px;">
+                        <div class="speed-grid">
+                            <div class="metric-card">
+                                <div class="metric-value" style="font-size:20px;color:${COLORS.order_to_ship}">${formatDays(c.avg_order_to_ship)}</div>
+                                <div class="metric-label">Order → Ship</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" style="font-size:20px;color:${COLORS.ship_to_pickup}">${formatDays(c.avg_ship_to_pickup)}</div>
+                                <div class="metric-label">Ship → Pickup</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" style="font-size:20px;color:${COLORS.pickup_to_delivery}">${formatDays(c.avg_pickup_to_delivery)}</div>
+                                <div class="metric-label">Pickup → Delivery</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" style="font-size:20px;color:${COLORS.delivery_to_delivered}">${formatDays(c.avg_delivery_to_delivered)}</div>
+                                <div class="metric-label">Delivery → Done</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" style="font-size:20px;">${formatDays(c.avg_total_hours)}</div>
+                                <div class="metric-label">Total</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" style="font-size:20px;">${c.orders || 0}</div>
+                                <div class="metric-label">Orders</div>
+                            </div>
+                        </div>
+
+                        <div class="speed-bar">
+                            ${segments.map(s => `<div class="speed-bar-segment" style="width:${Math.max((s.hours/segSum)*100, 5)}%;background:${s.color};">${formatDays(s.hours)}</div>`).join('')}
+                        </div>
+                        <div class="speed-bar-legend">
+                            ${segments.map(s => `<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${s.color};margin-right:4px;vertical-align:middle;"></span>${s.label}</span>`).join('')}
+                        </div>
+
+                        <div style="margin-top:12px;display:flex;gap:12px;">
+                            <span class="badge ${parseFloat(cDelRate) >= 90 ? 'badge-green' : parseFloat(cDelRate) >= 70 ? 'badge-amber' : 'badge-red'}">✅ ${cDelRate}% delivered</span>
+                            ${c.failed > 0 ? `<span class="badge badge-red">❌ ${c.failed} failed/returned</span>` : ''}
+                        </div>
+
+                        ${c.outliers && c.outliers.length > 0 ? `
+                        <details style="margin-top:12px;">
+                            <summary style="cursor:pointer;color:var(--text-secondary);font-size:12px;">⚠️ ${c.outliers.length} slow deliveries (>2× avg)</summary>
+                            <table class="outliers-table">
+                                <thead><tr><th>Order</th><th>Total Time</th><th>Status</th><th>Last Event</th></tr></thead>
+                                <tbody>
+                                    ${c.outliers.map(o => `<tr><td>${o.buyer_order}</td><td>${formatDays(o.total_hours)}</td><td>${o.status || '—'}</td><td>${o.last_event || '—'}</td></tr>`).join('')}
+                                </tbody>
+                            </table>
+                        </details>` : ''}
+                    </div>
+                </div>`;
+            }
+
+            document.getElementById('content').innerHTML = html || '<div class="metric-card" style="text-align:center;padding:40px;"><div class="metric-label">No shipping data available.</div></div>';
+        }
+
+        // Theme
+        function toggleTheme() {
+            const isDark = document.body.getAttribute('data-theme') === 'dark';
+            document.body.setAttribute('data-theme', isDark ? 'light' : 'dark');
+            localStorage.setItem('theme', isDark ? 'light' : 'dark');
+            document.getElementById('themeIcon').textContent = isDark ? '🌙' : '☀️';
+            document.getElementById('themeText').textContent = isDark ? 'Dark' : 'Light';
+        }
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        document.body.setAttribute('data-theme', savedTheme);
+        document.getElementById('themeIcon').textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+        document.getElementById('themeText').textContent = savedTheme === 'dark' ? 'Light' : 'Dark';
+
+        function logout() {
+            document.cookie = 'session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+            window.location.href = '/dashboard/login';
+        }
+
+        loadData();
+    </script>
+    <script src="/dashboard/sidebar.js"></script>
+    <script>renderSidebar('shipping-speed');</script>
+</body>
+</html>

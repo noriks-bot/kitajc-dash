@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Report - Noriks Analytics</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/dashboard/styles.css?v=20260224b">
+    <style>
+        .metrics-row {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+        @media (max-width: 1200px) { .metrics-row { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 600px) { .metrics-row { grid-template-columns: repeat(2, 1fr); } }
+        .pct-cod { color: #e74c3c; font-weight: 700; }
+        .pct-card { color: #2ecc71; font-weight: 700; }
+        .pct-paypal { color: #3498db; font-weight: 700; }
+        .pct-other { color: #95a5a6; font-weight: 700; }
+        .total-row td { font-weight: 700; background: var(--bg-secondary, #f0f9ff); }
+    </style>
+</head>
+<body>
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <aside class="sidebar"></aside>
+
+    <main class="main">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+                <h1 class="page-title">💳 Payment Report</h1>
+            </div>
+            <div class="topbar-right">
+                <button class="theme-toggle" onclick="toggleTheme()">
+                    <span id="themeIcon">🌙</span>
+                    <span id="themeText">Dark</span>
+                </button>
+                <div class="status-badge">
+                    <span class="status-dot"></span>
+                    <span id="lastUpdated">Live</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="content">
+            <div class="data-info-banner">
+                <div class="info-left">
+                    <span class="info-icon">📡</span>
+                    <div class="info-text">
+                        <strong>Data Source:</strong> WooCommerce
+                        <span class="info-sep">•</span>
+                        <strong>Last Sync:</strong> <span id="lastSyncTime">—</span>
+                    </div>
+                </div>
+                <span class="info-badge" id="dataRange">—</span>
+            </div>
+
+            <div class="filters-section">
+                <div class="filters-left">
+                    <div class="filter-group">
+                        <span class="filter-label">Period</span>
+                        <div class="preset-tabs">
+                            <button class="preset-tab" onclick="setDay('today')" id="btn-today">Today</button>
+                            <button class="preset-tab" onclick="setDay('yesterday')" id="btn-yesterday">Yesterday</button>
+                            <button class="preset-tab" onclick="setPreset(7)" id="btn-7d">7D</button>
+                            <button class="preset-tab" onclick="setPreset(14)" id="btn-14d">14D</button>
+                            <button class="preset-tab" onclick="setPreset(30)" id="btn-30d">30D</button>
+                            <button class="preset-tab" onclick="setMonth('current')" id="btn-month">This Month</button>
+                            <button class="preset-tab" onclick="setMonth('last')" id="btn-lastmonth">Last Month</button>
+                            <button class="preset-tab active" onclick="setYear()" id="btn-year">2026</button>
+                        </div>
+                    </div>
+                    <div class="filter-group">
+                        <span class="filter-label">Range</span>
+                        <div class="date-range">
+                            <input type="date" id="startDate" class="date-input">
+                            <span class="date-sep">→</span>
+                            <input type="date" id="endDate" class="date-input">
+                        </div>
+                    </div>
+                </div>
+                <button id="loadBtn" class="btn btn-primary" onclick="loadData()">Apply</button>
+            </div>
+
+            <div id="error" class="error" style="display:none;"><span>⚠️</span><span id="errorText"></span></div>
+
+            <div class="metrics-row" id="metrics-row" style="display:none">
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">🛒</div></div>
+                    <div class="metric-label">Total Orders</div>
+                    <div class="metric-value" id="m-total">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">💵</div></div>
+                    <div class="metric-label">COD</div>
+                    <div class="metric-value pct-cod" id="m-cod">—</div>
+                    <div class="metric-sub" id="m-cod-n"></div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">💳</div></div>
+                    <div class="metric-label">Card</div>
+                    <div class="metric-value pct-card" id="m-card">—</div>
+                    <div class="metric-sub" id="m-card-n"></div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">🅿️</div></div>
+                    <div class="metric-label">PayPal</div>
+                    <div class="metric-value pct-paypal" id="m-paypal">—</div>
+                    <div class="metric-sub" id="m-paypal-n"></div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">🔘</div></div>
+                    <div class="metric-label">Other</div>
+                    <div class="metric-value pct-other" id="m-other">—</div>
+                    <div class="metric-sub" id="m-other-n"></div>
+                </div>
+            </div>
+
+            <div class="data-card" id="chart-card" style="margin-bottom:24px; display:none">
+                <div class="data-card-header"><h3>Payment Methods by Day (%)</h3></div>
+                <div class="data-card-body">
+                    <canvas id="paymentChart" height="80"></canvas>
+                </div>
+            </div>
+
+            <div class="data-card" id="date-card" style="margin-bottom:24px; display:none">
+                <div class="data-card-header"><h3>By Date</h3></div>
+                <div class="data-card-body" style="overflow-x:auto">
+                    <table class="data-table">
+                        <thead><tr>
+                            <th>Date</th><th>Total</th>
+                            <th>COD</th><th>COD %</th>
+                            <th>Card</th><th>Card %</th>
+                            <th>PayPal</th><th>PayPal %</th>
+                            <th>Other</th>
+                        </tr></thead>
+                        <tbody id="date-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="data-card" id="country-card" style="display:none">
+                <div class="data-card-header"><h3>By Country</h3></div>
+                <div class="data-card-body" style="overflow-x:auto">
+                    <table class="data-table">
+                        <thead><tr>
+                            <th>Country</th><th>Total</th>
+                            <th>COD</th><th>COD %</th>
+                            <th>Card</th><th>Card %</th>
+                            <th>PayPal</th><th>PayPal %</th>
+                            <th>Other</th>
+                        </tr></thead>
+                        <tbody id="country-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Theme
+        function toggleTheme() {
+            const html = document.documentElement;
+            const newTheme = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeUI(newTheme);
+        }
+        function updateThemeUI(theme) {
+            document.getElementById('themeIcon').textContent = theme === 'light' ? '☀️' : '🌙';
+            document.getElementById('themeText').textContent = theme === 'light' ? 'Light' : 'Dark';
+        }
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        updateThemeUI(savedTheme);
+
+        // Sidebar
+        function toggleSidebar() {
+            document.querySelector('.sidebar').classList.toggle('open');
+            document.querySelector('.sidebar-overlay').classList.toggle('active');
+        }
+        function toggleCollapse() {
+            const sidebar = document.querySelector('.sidebar');
+            sidebar.classList.toggle('collapsed');
+            localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+        }
+        if (localStorage.getItem('sidebarCollapsed') === 'true') {
+            document.querySelector('.sidebar')?.classList.add('collapsed');
+        }
+
+        // Helpers
+        function formatDate(d) { return d.toISOString().split('T')[0]; }
+        function pct(n, total) { return total ? (n / total * 100).toFixed(1) + '%' : '0%'; }
+
+        function updateActiveTab(id) {
+            document.querySelectorAll('.preset-tab').forEach(b => b.classList.remove('active'));
+            const btn = document.getElementById('btn-' + id);
+            if (btn) btn.classList.add('active');
+        }
+
+        function setPreset(days) {
+            const end = new Date();
+            const start = new Date(Date.now() - (days - 1) * 86400000);
+            document.getElementById('startDate').value = formatDate(start);
+            document.getElementById('endDate').value = formatDate(end);
+            updateActiveTab(days + 'd');
+            loadData();
+        }
+
+        function setDay(which) {
+            const today = new Date();
+            if (which === 'yesterday') today.setDate(today.getDate() - 1);
+            document.getElementById('startDate').value = formatDate(today);
+            document.getElementById('endDate').value = formatDate(today);
+            updateActiveTab(which);
+            loadData();
+        }
+
+        function setMonth(which) {
+            const now = new Date();
+            let start, end;
+            if (which === 'current') {
+                start = new Date(now.getFullYear(), now.getMonth(), 1);
+                end = now;
+                updateActiveTab('month');
+            } else {
+                start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                end = new Date(now.getFullYear(), now.getMonth(), 0);
+                updateActiveTab('lastmonth');
+            }
+            document.getElementById('startDate').value = formatDate(start);
+            document.getElementById('endDate').value = formatDate(end);
+            loadData();
+        }
+
+        function setYear() {
+            document.getElementById('startDate').value = '2026-01-01';
+            document.getElementById('endDate').value = formatDate(new Date());
+            updateActiveTab('year');
+            loadData();
+        }
+
+        let chart = null;
+
+        async function loadData() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            if (!start || !end) return;
+
+            const btn = document.getElementById('loadBtn');
+            btn.textContent = 'Loading...';
+            btn.disabled = true;
+            document.getElementById('error').style.display = 'none';
+            ['metrics-row','chart-card','date-card','country-card'].forEach(id => document.getElementById(id).style.display = 'none');
+
+            try {
+                const res = await fetch('/api/payment-report?start=' + start + '&end=' + end);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                render(data, start, end);
+            } catch(e) {
+                document.getElementById('errorText').textContent = e.message;
+                document.getElementById('error').style.display = 'flex';
+            } finally {
+                btn.textContent = 'Apply';
+                btn.disabled = false;
+            }
+        }
+
+        function render(data, start, end) {
+            const t = data.totals;
+
+            // Update last sync
+            fetch('/api/status').then(r => r.json()).then(s => {
+                if (s.lastSync) document.getElementById('lastSyncTime').textContent = new Date(s.lastSync).toLocaleString();
+            }).catch(() => {});
+            document.getElementById('dataRange').textContent = start + ' → ' + end;
+
+            // Metrics
+            document.getElementById('m-total').textContent = (t.total || 0).toLocaleString();
+            document.getElementById('m-cod').textContent = pct(t.cod||0, t.total);
+            document.getElementById('m-cod-n').textContent = (t.cod||0) + ' orders';
+            document.getElementById('m-card').textContent = pct(t.card||0, t.total);
+            document.getElementById('m-card-n').textContent = (t.card||0) + ' orders';
+            document.getElementById('m-paypal').textContent = pct(t.paypal||0, t.total);
+            document.getElementById('m-paypal-n').textContent = (t.paypal||0) + ' orders';
+            document.getElementById('m-other').textContent = pct(t.other||0, t.total);
+            document.getElementById('m-other-n').textContent = (t.other||0) + ' orders';
+            document.getElementById('metrics-row').style.display = 'grid';
+
+            // Chart
+            const dates = Object.keys(data.byDate).sort();
+            const ctx = document.getElementById('paymentChart').getContext('2d');
+            if (chart) chart.destroy();
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        { label: 'COD', data: dates.map(d => data.byDate[d].total ? (data.byDate[d].cod/data.byDate[d].total*100) : 0), backgroundColor: '#e74c3c', stack: 's' },
+                        { label: 'Card', data: dates.map(d => data.byDate[d].total ? (data.byDate[d].card/data.byDate[d].total*100) : 0), backgroundColor: '#2ecc71', stack: 's' },
+                        { label: 'PayPal', data: dates.map(d => data.byDate[d].total ? (data.byDate[d].paypal/data.byDate[d].total*100) : 0), backgroundColor: '#3498db', stack: 's' },
+                        { label: 'Other', data: dates.map(d => data.byDate[d].total ? (data.byDate[d].other/data.byDate[d].total*100) : 0), backgroundColor: '#95a5a6', stack: 's' }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { stacked: true },
+                        y: { stacked: true, max: 100, ticks: { callback: v => v + '%' } }
+                    },
+                    plugins: { tooltip: { callbacks: { label: c => c.dataset.label + ': ' + c.raw.toFixed(1) + '%' } } }
+                }
+            });
+            document.getElementById('chart-card').style.display = 'block';
+
+            // Date table
+            const dtb = document.getElementById('date-tbody');
+            dtb.innerHTML = '';
+            let tot = { total:0, cod:0, card:0, paypal:0, other:0 };
+            for (const d of dates) {
+                const r = data.byDate[d];
+                tot.total+=r.total; tot.cod+=r.cod; tot.card+=r.card; tot.paypal+=r.paypal; tot.other+=r.other;
+                dtb.innerHTML += `<tr><td>${d}</td><td>${r.total}</td><td>${r.cod}</td><td class="pct-cod">${pct(r.cod,r.total)}</td><td>${r.card}</td><td class="pct-card">${pct(r.card,r.total)}</td><td>${r.paypal}</td><td class="pct-paypal">${pct(r.paypal,r.total)}</td><td>${r.other}</td></tr>`;
+            }
+            dtb.innerHTML += `<tr class="total-row"><td>TOTAL</td><td>${tot.total}</td><td>${tot.cod}</td><td class="pct-cod">${pct(tot.cod,tot.total)}</td><td>${tot.card}</td><td class="pct-card">${pct(tot.card,tot.total)}</td><td>${tot.paypal}</td><td class="pct-paypal">${pct(tot.paypal,tot.total)}</td><td>${tot.other}</td></tr>`;
+            document.getElementById('date-card').style.display = 'block';
+
+            // Country table
+            const ctb = document.getElementById('country-tbody');
+            ctb.innerHTML = '';
+            let ctot = { total:0, cod:0, card:0, paypal:0, other:0 };
+            for (const c of Object.keys(data.byCountry).sort()) {
+                const r = data.byCountry[c];
+                ctot.total+=(r.total||0); ctot.cod+=(r.cod||0); ctot.card+=(r.card||0); ctot.paypal+=(r.paypal||0); ctot.other+=(r.other||0);
+                ctb.innerHTML += `<tr><td><strong>${c}</strong></td><td>${r.total||0}</td><td>${r.cod||0}</td><td class="pct-cod">${pct(r.cod||0,r.total||0)}</td><td>${r.card||0}</td><td class="pct-card">${pct(r.card||0,r.total||0)}</td><td>${r.paypal||0}</td><td class="pct-paypal">${pct(r.paypal||0,r.total||0)}</td><td>${r.other||0}</td></tr>`;
+            }
+            ctb.innerHTML += `<tr class="total-row"><td>TOTAL</td><td>${ctot.total}</td><td>${ctot.cod}</td><td class="pct-cod">${pct(ctot.cod,ctot.total)}</td><td>${ctot.card}</td><td class="pct-card">${pct(ctot.card,ctot.total)}</td><td>${ctot.paypal}</td><td class="pct-paypal">${pct(ctot.paypal,ctot.total)}</td><td>${ctot.other}</td></tr>`;
+            document.getElementById('country-card').style.display = 'block';
+        }
+
+        // Default: 2026 YTD
+        setYear();
+    </script>
+    <script src="/dashboard/sidebar.js"></script>
+    <script>renderSidebar('payment-report');</script>
+</body>
+</html>

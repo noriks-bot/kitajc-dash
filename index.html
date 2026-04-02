@@ -1,0 +1,2007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Noriks Analytics</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/dashboard/styles.css?v=20260224be">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+        
+        <!-- Sidebar - FIRMA STYLE -->
+        <aside class="sidebar"></aside>
+        
+        <!-- Main Content -->
+        <main class="main">
+            <header class="topbar">
+                <div class="topbar-left">
+                    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+                    <h1 class="page-title">Performance Dashboard</h1>
+                </div>
+                <div class="topbar-right">
+                    <button class="refresh-btn" onclick="refreshData()" id="refreshBtn" title="Osveži podatke">
+                        🔄 Refresh
+                    </button>
+                    <div class="status-badge">
+                        <span class="status-dot"></span>
+                        <span id="lastUpdated">Live</span>
+                    </div>
+                </div>
+            </header>
+            
+            <div class="content">
+                <!-- Data Info Banner -->
+                <div class="data-info-banner" id="dataInfoBanner">
+                    <div class="info-left">
+                        <span class="info-icon">📡</span>
+                        <div class="info-text">
+                            <strong>Data Source:</strong> WooCommerce + Meta Ads
+                            <span class="info-sep">•</span>
+                            <strong>Last Sync:</strong> <span id="lastSyncTime">—</span>
+                        </div>
+                    </div>
+                    <div class="info-right">
+                        <span class="info-badge" id="dataRange">—</span>
+                    </div>
+                </div>
+                
+                <!-- Filters -->
+                <div class="filters-section">
+                    <div class="filters-left">
+                        <div class="filter-group">
+                            <span class="filter-label">Period</span>
+                            <div class="preset-tabs">
+                                <button class="preset-tab" onclick="setDay('today')" id="btn-today">Today</button>
+                                <button class="preset-tab" onclick="setDay('yesterday')" id="btn-yesterday">Yesterday</button>
+                                <button class="preset-tab" onclick="setPreset(7)" id="btn-7d">7D</button>
+                                <button class="preset-tab" onclick="setPreset(14)" id="btn-14d">14D</button>
+                                <button class="preset-tab" onclick="setPreset(30)" id="btn-30d">30D</button>
+                                <button class="preset-tab" onclick="setMonth('current')" id="btn-month">This Month</button>
+                                <button class="preset-tab" onclick="setMonth('last')" id="btn-lastmonth">Last Month</button>
+                                <button class="preset-tab" onclick="setYear()" id="btn-year">Year</button>
+                            </div>
+                        </div>
+                        <div class="filter-group">
+                            <span class="filter-label">Range</span>
+                            <div class="date-range">
+                                <input type="date" id="startDate" class="date-input">
+                                <span class="date-sep">→</span>
+                                <input type="date" id="endDate" class="date-input">
+                            </div>
+                        </div>
+                    </div>
+                    <button id="loadBtn" class="btn btn-primary" onclick="loadData()">
+                        Apply
+                    </button>
+                </div>
+                
+                <div id="error" class="error" style="display: none;">
+                    <span>⚠️</span>
+                    <span id="errorText"></span>
+                </div>
+                
+                <!-- Country Summary Cards -->
+                <div class="country-summary" id="countrySummary">
+                    <div class="country-card hr">
+                        <div class="country-header">
+                            <div class="country-info">
+                                <span class="country-flag">🇭🇷</span>
+                                <span class="country-name">Croatia</span>
+                            </div>
+                            <div class="country-roas text-primary" id="hr-roas">—</div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hr-spend">—</div>
+                                <div class="country-stat-label">Spend</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hr-orders">—</div>
+                                <div class="country-stat-label">Orders</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hr-cpa">—</div>
+                                <div class="country-stat-label">CPA</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hr-aov">—</div>
+                                <div class="country-stat-label">AOV</div>
+                            </div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hr-revgross">—</div>
+                                <div class="country-stat-label">Rev Gross</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hr-revnorej">—</div>
+                                <div class="country-stat-label">Rev w/o Rej</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hr-revneto">—</div>
+                                <div class="country-stat-label">Rev Neto</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hr-tax">—</div>
+                                <div class="country-stat-label">TAX</div>
+                            </div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hr-productcost">—</div>
+                                <div class="country-stat-label">Prod Cost</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hr-prodcostorder">—</div>
+                                <div class="country-stat-label">Prod C/Order</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hr-shippingcost">—</div>
+                                <div class="country-stat-label">Ship Cost</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hr-shipcostorder">—</div>
+                                <div class="country-stat-label">Ship/Order</div>
+                            </div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hr-profit">—</div>
+                                <div class="country-stat-label">Profit</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hr-ppo">—</div>
+                                <div class="country-stat-label">Profit/Paket</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hr-profitnew">—</div>
+                                <div class="country-stat-label">Profit New</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hr-profitret">—</div>
+                                <div class="country-stat-label">Profit Ret</div>
+                            </div>
+                        </div>
+                        <details class="real-money-dropdown">
+                            <summary class="real-money-toggle">💰 Real Money <span class="dropdown-arrow">▼</span></summary>
+                            <div class="country-stats country-row-4">
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hr-allrealorders">—</div>
+                                    <div class="country-stat-label">All MK Orders</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hr-allrealgross">—</div>
+                                    <div class="country-stat-label">All Gross</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hr-allrealneto">—</div>
+                                    <div class="country-stat-label">All Neto</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hr-allrealtax">—</div>
+                                    <div class="country-stat-label">All Tax</div>
+                                </div>
+                            </div>
+                            <div class="country-stats country-row-4">
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hr-realorders">—</div>
+                                    <div class="country-stat-label">Paid Orders</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hr-realgross">—</div>
+                                    <div class="country-stat-label">Paid Gross</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hr-realneto">—</div>
+                                    <div class="country-stat-label">Paid Neto</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hr-realtax">—</div>
+                                    <div class="country-stat-label">Paid Tax</div>
+                                </div>
+                            </div>
+                            <div class="country-stats country-row-4">
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hr-extrapaidorders">—</div>
+                                    <div class="country-stat-label">MK Extra Paid</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hr-extrapaidgross">—</div>
+                                    <div class="country-stat-label">Extra Gross</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hr-extrapaidneto">—</div>
+                                    <div class="country-stat-label">Extra Neto</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hr-extrapaidtax">—</div>
+                                    <div class="country-stat-label">Extra Tax</div>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
+                    <div class="country-card cz">
+                        <div class="country-header">
+                            <div class="country-info">
+                                <span class="country-flag">🇨🇿</span>
+                                <span class="country-name">Czech Republic</span>
+                            </div>
+                            <div class="country-roas text-green" id="cz-roas">—</div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="cz-spend">—</div>
+                                <div class="country-stat-label">Spend</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="cz-orders">—</div>
+                                <div class="country-stat-label">Orders</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="cz-cpa">—</div>
+                                <div class="country-stat-label">CPA</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="cz-aov">—</div>
+                                <div class="country-stat-label">AOV</div>
+                            </div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="cz-revgross">—</div>
+                                <div class="country-stat-label">Rev Gross</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="cz-revnorej">—</div>
+                                <div class="country-stat-label">Rev w/o Rej</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="cz-revneto">—</div>
+                                <div class="country-stat-label">Rev Neto</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="cz-tax">—</div>
+                                <div class="country-stat-label">TAX</div>
+                            </div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="cz-productcost">—</div>
+                                <div class="country-stat-label">Prod Cost</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="cz-prodcostorder">—</div>
+                                <div class="country-stat-label">Prod C/Order</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="cz-shippingcost">—</div>
+                                <div class="country-stat-label">Ship Cost</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="cz-shipcostorder">—</div>
+                                <div class="country-stat-label">Ship/Order</div>
+                            </div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="cz-profit">—</div>
+                                <div class="country-stat-label">Profit</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="cz-ppo">—</div>
+                                <div class="country-stat-label">Profit/Paket</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="cz-profitnew">—</div>
+                                <div class="country-stat-label">Profit New</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="cz-profitret">—</div>
+                                <div class="country-stat-label">Profit Ret</div>
+                            </div>
+                        </div>
+                        <details class="real-money-dropdown">
+                            <summary class="real-money-toggle">💰 Real Money <span class="dropdown-arrow">▼</span></summary>
+                            <div class="country-stats country-row-4">
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="cz-allrealorders">—</div>
+                                    <div class="country-stat-label">All MK Orders</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="cz-allrealgross">—</div>
+                                    <div class="country-stat-label">All Gross</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="cz-allrealneto">—</div>
+                                    <div class="country-stat-label">All Neto</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="cz-allrealtax">—</div>
+                                    <div class="country-stat-label">All Tax</div>
+                                </div>
+                            </div>
+                            <div class="country-stats country-row-4">
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="cz-realorders">—</div>
+                                    <div class="country-stat-label">Paid Orders</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="cz-realgross">—</div>
+                                    <div class="country-stat-label">Paid Gross</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="cz-realneto">—</div>
+                                    <div class="country-stat-label">Paid Neto</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="cz-realtax">—</div>
+                                    <div class="country-stat-label">Paid Tax</div>
+                                </div>
+                            </div>
+                            <div class="country-stats country-row-4">
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="cz-extrapaidorders">—</div>
+                                    <div class="country-stat-label">MK Extra Paid</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="cz-extrapaidgross">—</div>
+                                    <div class="country-stat-label">Extra Gross</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="cz-extrapaidneto">—</div>
+                                    <div class="country-stat-label">Extra Neto</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="cz-extrapaidtax">—</div>
+                                    <div class="country-stat-label">Extra Tax</div>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
+                    <div class="country-card pl">
+                        <div class="country-header">
+                            <div class="country-info">
+                                <span class="country-flag">🇵🇱</span>
+                                <span class="country-name">Poland</span>
+                            </div>
+                            <div class="country-roas text-amber" id="pl-roas">—</div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="pl-spend">—</div>
+                                <div class="country-stat-label">Spend</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="pl-orders">—</div>
+                                <div class="country-stat-label">Orders</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="pl-cpa">—</div>
+                                <div class="country-stat-label">CPA</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="pl-aov">—</div>
+                                <div class="country-stat-label">AOV</div>
+                            </div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="pl-revgross">—</div>
+                                <div class="country-stat-label">Rev Gross</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="pl-revnorej">—</div>
+                                <div class="country-stat-label">Rev w/o Rej</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="pl-revneto">—</div>
+                                <div class="country-stat-label">Rev Neto</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="pl-tax">—</div>
+                                <div class="country-stat-label">TAX</div>
+                            </div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="pl-productcost">—</div>
+                                <div class="country-stat-label">Prod Cost</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="pl-prodcostorder">—</div>
+                                <div class="country-stat-label">Prod C/Order</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="pl-shippingcost">—</div>
+                                <div class="country-stat-label">Ship Cost</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="pl-shipcostorder">—</div>
+                                <div class="country-stat-label">Ship/Order</div>
+                            </div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="pl-profit">—</div>
+                                <div class="country-stat-label">Profit</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="pl-ppo">—</div>
+                                <div class="country-stat-label">Profit/Paket</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="pl-profitnew">—</div>
+                                <div class="country-stat-label">Profit New</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="pl-profitret">—</div>
+                                <div class="country-stat-label">Profit Ret</div>
+                            </div>
+                        </div>
+                        <details class="real-money-dropdown">
+                            <summary class="real-money-toggle">💰 Real Money <span class="dropdown-arrow">▼</span></summary>
+                            <div class="country-stats country-row-4">
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="pl-allrealorders">—</div>
+                                    <div class="country-stat-label">All MK Orders</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="pl-allrealgross">—</div>
+                                    <div class="country-stat-label">All Gross</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="pl-allrealneto">—</div>
+                                    <div class="country-stat-label">All Neto</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="pl-allrealtax">—</div>
+                                    <div class="country-stat-label">All Tax</div>
+                                </div>
+                            </div>
+                            <div class="country-stats country-row-4">
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="pl-realorders">—</div>
+                                    <div class="country-stat-label">Paid Orders</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="pl-realgross">—</div>
+                                    <div class="country-stat-label">Paid Gross</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="pl-realneto">—</div>
+                                    <div class="country-stat-label">Paid Neto</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="pl-realtax">—</div>
+                                    <div class="country-stat-label">Paid Tax</div>
+                                </div>
+                            </div>
+                            <div class="country-stats country-row-4">
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="pl-extrapaidorders">—</div>
+                                    <div class="country-stat-label">MK Extra Paid</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="pl-extrapaidgross">—</div>
+                                    <div class="country-stat-label">Extra Gross</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="pl-extrapaidneto">—</div>
+                                    <div class="country-stat-label">Extra Neto</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="pl-extrapaidtax">—</div>
+                                    <div class="country-stat-label">Extra Tax</div>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
+                    <div class="country-card gr">
+                        <div class="country-header">
+                            <div class="country-info">
+                                <span class="country-flag">🇬🇷</span>
+                                <span class="country-name">Greece</span>
+                            </div>
+                            <div class="country-roas text-blue" id="gr-roas">—</div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="gr-spend">—</div>
+                                <div class="country-stat-label">Spend</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="gr-orders">—</div>
+                                <div class="country-stat-label">Orders</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="gr-cpa">—</div>
+                                <div class="country-stat-label">CPA</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="gr-aov">—</div>
+                                <div class="country-stat-label">AOV</div>
+                            </div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="gr-revgross">—</div>
+                                <div class="country-stat-label">Rev Gross</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="gr-revnorej">—</div>
+                                <div class="country-stat-label">Rev w/o Rej</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="gr-revneto">—</div>
+                                <div class="country-stat-label">Rev Neto</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="gr-tax">—</div>
+                                <div class="country-stat-label">TAX</div>
+                            </div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="gr-productcost">—</div>
+                                <div class="country-stat-label">Prod Cost</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="gr-prodcostorder">—</div>
+                                <div class="country-stat-label">Prod C/Order</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="gr-shippingcost">—</div>
+                                <div class="country-stat-label">Ship Cost</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="gr-shipcostorder">—</div>
+                                <div class="country-stat-label">Ship/Order</div>
+                            </div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="gr-profit">—</div>
+                                <div class="country-stat-label">Profit</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="gr-ppo">—</div>
+                                <div class="country-stat-label">Profit/Paket</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="gr-profitnew">—</div>
+                                <div class="country-stat-label">Profit New</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="gr-profitret">—</div>
+                                <div class="country-stat-label">Profit Ret</div>
+                            </div>
+                        </div>
+                        <details class="real-money-dropdown">
+                            <summary class="real-money-toggle">💰 Real Money <span class="dropdown-arrow">▼</span></summary>
+                            <div class="country-stats country-row-4">
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="gr-allrealorders">—</div>
+                                    <div class="country-stat-label">All MK Orders</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="gr-allrealgross">—</div>
+                                    <div class="country-stat-label">All Gross</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="gr-allrealneto">—</div>
+                                    <div class="country-stat-label">All Neto</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="gr-allrealtax">—</div>
+                                    <div class="country-stat-label">All Tax</div>
+                                </div>
+                            </div>
+                            <div class="country-stats country-row-4">
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="gr-realorders">—</div>
+                                    <div class="country-stat-label">Paid Orders</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="gr-realgross">—</div>
+                                    <div class="country-stat-label">Paid Gross</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="gr-realneto">—</div>
+                                    <div class="country-stat-label">Paid Neto</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="gr-realtax">—</div>
+                                    <div class="country-stat-label">Paid Tax</div>
+                                </div>
+                            </div>
+                            <div class="country-stats country-row-4">
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="gr-extrapaidorders">—</div>
+                                    <div class="country-stat-label">MK Extra Paid</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="gr-extrapaidgross">—</div>
+                                    <div class="country-stat-label">Extra Gross</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="gr-extrapaidneto">—</div>
+                                    <div class="country-stat-label">Extra Neto</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="gr-extrapaidtax">—</div>
+                                    <div class="country-stat-label">Extra Tax</div>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
+                    <div class="country-card it">
+                        <div class="country-header">
+                            <div class="country-info">
+                                <span class="country-flag">🇮🇹</span>
+                                <span class="country-name">Italy</span>
+                            </div>
+                            <div class="country-roas text-purple" id="it-roas">—</div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="it-spend">—</div>
+                                <div class="country-stat-label">Spend</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="it-orders">—</div>
+                                <div class="country-stat-label">Orders</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="it-cpa">—</div>
+                                <div class="country-stat-label">CPA</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="it-aov">—</div>
+                                <div class="country-stat-label">AOV</div>
+                            </div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="it-revgross">—</div>
+                                <div class="country-stat-label">Rev Gross</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="it-revnorej">—</div>
+                                <div class="country-stat-label">Rev w/o Rej</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="it-revneto">—</div>
+                                <div class="country-stat-label">Rev Neto</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="it-tax">—</div>
+                                <div class="country-stat-label">TAX</div>
+                            </div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="it-productcost">—</div>
+                                <div class="country-stat-label">Prod Cost</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="it-prodcostorder">—</div>
+                                <div class="country-stat-label">Prod C/Order</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="it-shippingcost">—</div>
+                                <div class="country-stat-label">Ship Cost</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="it-shipcostorder">—</div>
+                                <div class="country-stat-label">Ship/Order</div>
+                            </div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="it-profit">—</div>
+                                <div class="country-stat-label">Profit</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="it-ppo">—</div>
+                                <div class="country-stat-label">Profit/Paket</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="it-profitnew">—</div>
+                                <div class="country-stat-label">Profit New</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="it-profitret">—</div>
+                                <div class="country-stat-label">Profit Ret</div>
+                            </div>
+                        </div>
+                        <details class="real-money-dropdown">
+                            <summary class="real-money-toggle">💰 Real Money <span class="dropdown-arrow">▼</span></summary>
+                            <div class="country-stats country-row-4">
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="it-allrealorders">—</div>
+                                    <div class="country-stat-label">All MK Orders</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="it-allrealgross">—</div>
+                                    <div class="country-stat-label">All Gross</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="it-allrealneto">—</div>
+                                    <div class="country-stat-label">All Neto</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="it-allrealtax">—</div>
+                                    <div class="country-stat-label">All Tax</div>
+                                </div>
+                            </div>
+                            <div class="country-stats country-row-4">
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="it-realorders">—</div>
+                                    <div class="country-stat-label">Paid Orders</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="it-realgross">—</div>
+                                    <div class="country-stat-label">Paid Gross</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="it-realneto">—</div>
+                                    <div class="country-stat-label">Paid Neto</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="it-realtax">—</div>
+                                    <div class="country-stat-label">Paid Tax</div>
+                                </div>
+                            </div>
+                            <div class="country-stats country-row-4">
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="it-extrapaidorders">—</div>
+                                    <div class="country-stat-label">MK Extra Paid</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="it-extrapaidgross">—</div>
+                                    <div class="country-stat-label">Extra Gross</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="it-extrapaidneto">—</div>
+                                    <div class="country-stat-label">Extra Neto</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="it-extrapaidtax">—</div>
+                                    <div class="country-stat-label">Extra Tax</div>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
+                    <div class="country-card hu">
+                        <div class="country-header">
+                            <div class="country-info">
+                                <span class="country-flag">🇭🇺</span>
+                                <span class="country-name">Hungary</span>
+                            </div>
+                            <div class="country-roas text-orange" id="hu-roas">—</div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hu-spend">—</div>
+                                <div class="country-stat-label">Spend</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hu-orders">—</div>
+                                <div class="country-stat-label">Orders</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hu-cpa">—</div>
+                                <div class="country-stat-label">CPA</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hu-aov">—</div>
+                                <div class="country-stat-label">AOV</div>
+                            </div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hu-revgross">—</div>
+                                <div class="country-stat-label">Rev Gross</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hu-revnorej">—</div>
+                                <div class="country-stat-label">Rev w/o Rej</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hu-revneto">—</div>
+                                <div class="country-stat-label">Rev Neto</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hu-tax">—</div>
+                                <div class="country-stat-label">TAX</div>
+                            </div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hu-productcost">—</div>
+                                <div class="country-stat-label">Prod Cost</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hu-prodcostorder">—</div>
+                                <div class="country-stat-label">Prod C/Order</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hu-shippingcost">—</div>
+                                <div class="country-stat-label">Ship Cost</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hu-shipcostorder">—</div>
+                                <div class="country-stat-label">Ship/Order</div>
+                            </div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hu-profit">—</div>
+                                <div class="country-stat-label">Profit</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hu-ppo">—</div>
+                                <div class="country-stat-label">Profit/Paket</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hu-profitnew">—</div>
+                                <div class="country-stat-label">Profit New</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="hu-profitret">—</div>
+                                <div class="country-stat-label">Profit Ret</div>
+                            </div>
+                        </div>
+                        <details class="real-money-dropdown">
+                            <summary class="real-money-toggle">💰 Real Money <span class="dropdown-arrow">▼</span></summary>
+                            <div class="country-stats country-row-4">
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hu-allrealorders">—</div>
+                                    <div class="country-stat-label">All MK Orders</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hu-allrealgross">—</div>
+                                    <div class="country-stat-label">All Gross</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hu-allrealneto">—</div>
+                                    <div class="country-stat-label">All Neto</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hu-allrealtax">—</div>
+                                    <div class="country-stat-label">All Tax</div>
+                                </div>
+                            </div>
+                            <div class="country-stats country-row-4">
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hu-realorders">—</div>
+                                    <div class="country-stat-label">Paid Orders</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hu-realgross">—</div>
+                                    <div class="country-stat-label">Paid Gross</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hu-realneto">—</div>
+                                    <div class="country-stat-label">Paid Neto</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hu-realtax">—</div>
+                                    <div class="country-stat-label">Paid Tax</div>
+                                </div>
+                            </div>
+                            <div class="country-stats country-row-4">
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hu-extrapaidorders">—</div>
+                                    <div class="country-stat-label">MK Extra Paid</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hu-extrapaidgross">—</div>
+                                    <div class="country-stat-label">Extra Gross</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hu-extrapaidneto">—</div>
+                                    <div class="country-stat-label">Extra Neto</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="hu-extrapaidtax">—</div>
+                                    <div class="country-stat-label">Extra Tax</div>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
+                    <div class="country-card sk">
+                        <div class="country-header">
+                            <div class="country-info">
+                                <span class="country-flag">🇸🇰</span>
+                                <span class="country-name">Slovakia</span>
+                            </div>
+                            <div class="country-roas text-teal" id="sk-roas">—</div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="sk-spend">—</div>
+                                <div class="country-stat-label">Spend</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="sk-orders">—</div>
+                                <div class="country-stat-label">Orders</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="sk-cpa">—</div>
+                                <div class="country-stat-label">CPA</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="sk-aov">—</div>
+                                <div class="country-stat-label">AOV</div>
+                            </div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="sk-revgross">—</div>
+                                <div class="country-stat-label">Rev Gross</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="sk-revnorej">—</div>
+                                <div class="country-stat-label">Rev w/o Rej</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="sk-revneto">—</div>
+                                <div class="country-stat-label">Rev Neto</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="sk-tax">—</div>
+                                <div class="country-stat-label">TAX</div>
+                            </div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="sk-productcost">—</div>
+                                <div class="country-stat-label">Prod Cost</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="sk-prodcostorder">—</div>
+                                <div class="country-stat-label">Prod C/Order</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="sk-shippingcost">—</div>
+                                <div class="country-stat-label">Ship Cost</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="sk-shipcostorder">—</div>
+                                <div class="country-stat-label">Ship/Order</div>
+                            </div>
+                        </div>
+                        <div class="country-stats country-row-4">
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="sk-profit">—</div>
+                                <div class="country-stat-label">Profit</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="sk-ppo">—</div>
+                                <div class="country-stat-label">Profit/Paket</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="sk-profitnew">—</div>
+                                <div class="country-stat-label">Profit New</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" id="sk-profitret">—</div>
+                                <div class="country-stat-label">Profit Ret</div>
+                            </div>
+                        </div>
+                        <details class="real-money-dropdown">
+                            <summary class="real-money-toggle">💰 Real Money <span class="dropdown-arrow">▼</span></summary>
+                            <div class="country-stats country-row-4">
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="sk-allrealorders">—</div>
+                                    <div class="country-stat-label">All MK Orders</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="sk-allrealgross">—</div>
+                                    <div class="country-stat-label">All Gross</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="sk-allrealneto">—</div>
+                                    <div class="country-stat-label">All Neto</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="sk-allrealtax">—</div>
+                                    <div class="country-stat-label">All Tax</div>
+                                </div>
+                            </div>
+                            <div class="country-stats country-row-4">
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="sk-realorders">—</div>
+                                    <div class="country-stat-label">Paid Orders</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="sk-realgross">—</div>
+                                    <div class="country-stat-label">Paid Gross</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="sk-realneto">—</div>
+                                    <div class="country-stat-label">Paid Neto</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="sk-realtax">—</div>
+                                    <div class="country-stat-label">Paid Tax</div>
+                                </div>
+                            </div>
+                            <div class="country-stats country-row-4">
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="sk-extrapaidorders">—</div>
+                                    <div class="country-stat-label">MK Extra Paid</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="sk-extrapaidgross">—</div>
+                                    <div class="country-stat-label">Extra Gross</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="sk-extrapaidneto">—</div>
+                                    <div class="country-stat-label">Extra Neto</div>
+                                </div>
+                                <div class="country-stat">
+                                    <div class="country-stat-value" id="sk-extrapaidtax">—</div>
+                                    <div class="country-stat-label">Extra Tax</div>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+                
+                <!-- Metrics Grid -->
+                <!-- Row 1: Spend, Orders, CPA All, ROAS All, CPA New, ROAS New -->
+                <div class="metrics-grid metrics-row-6">
+                    <div class="metric-card">
+                        <div class="metric-header"><div class="metric-icon">💳</div></div>
+                        <div class="metric-label">Total Spend</div>
+                        <div class="metric-value text-primary" id="totalSpend">—</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header"><div class="metric-icon">📦</div></div>
+                        <div class="metric-label">Total Orders</div>
+                        <div class="metric-value" id="totalOrders">—</div>
+                        <div class="metric-sub" id="totalNewRet"></div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header"><div class="metric-icon">🎯</div></div>
+                        <div class="metric-label">CPA (All)</div>
+                        <div class="metric-value text-amber" id="totalCPA">—</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header"><div class="metric-icon">📈</div></div>
+                        <div class="metric-label">ROAS (All)</div>
+                        <div class="metric-value" id="totalROAS">—</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header"><div class="metric-icon">🆕</div></div>
+                        <div class="metric-label">CPA (New)</div>
+                        <div class="metric-value text-purple" id="totalCPANew">—</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header"><div class="metric-icon">🆕</div></div>
+                        <div class="metric-label">ROAS (New)</div>
+                        <div class="metric-value" id="totalROASNew">—</div>
+                    </div>
+                </div>
+                
+                <!-- Row 2: Revenues + TAX -->
+                <div class="metrics-grid metrics-row-5">
+                    <div class="metric-card">
+                        <div class="metric-header"><div class="metric-icon">🛒</div></div>
+                        <div class="metric-label">AOV</div>
+                        <div class="metric-value text-green" id="totalAOV">—</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header"><div class="metric-icon">💰</div></div>
+                        <div class="metric-label">Rev Gross</div>
+                        <div class="metric-value text-green" id="totalRevenueGross">—</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header"><div class="metric-icon">💵</div></div>
+                        <div class="metric-label">Rev w/o Rej</div>
+                        <div class="metric-value text-green" id="totalRevNoRej">—</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header"><div class="metric-icon">💶</div></div>
+                        <div class="metric-label">Rev Neto</div>
+                        <div class="metric-value text-green" id="totalRevenue">—</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header"><div class="metric-icon">🧾</div></div>
+                        <div class="metric-label">TAX</div>
+                        <div class="metric-value text-amber" id="totalTax">—</div>
+                    </div>
+                </div>
+                
+                <!-- Row 3: Costs -->
+                <div class="metrics-grid metrics-row-4">
+                    <div class="metric-card">
+                        <div class="metric-header"><div class="metric-icon">🏭</div></div>
+                        <div class="metric-label">Product Cost</div>
+                        <div class="metric-value text-amber" id="totalProductCost">—</div>
+                        <div class="metric-sub" id="totalProducts"></div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header"><div class="metric-icon">🏷️</div></div>
+                        <div class="metric-label">Prod C/Order</div>
+                        <div class="metric-value text-amber" id="totalProdCostOrder">—</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header"><div class="metric-icon">🚚</div></div>
+                        <div class="metric-label">Shipping Cost</div>
+                        <div class="metric-value text-amber" id="totalShippingCost">—</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header"><div class="metric-icon">📊</div></div>
+                        <div class="metric-label">Ship C/Order</div>
+                        <div class="metric-value text-amber" id="totalShipCostOrder">—</div>
+                    </div>
+                </div>
+                
+                <!-- Row 4: Profits -->
+                <div class="metrics-grid metrics-row-5">
+                    <div class="metric-card">
+                        <div class="metric-header"><div class="metric-icon">✨</div></div>
+                        <div class="metric-label">Profit (All)</div>
+                        <div class="metric-value" id="totalProfit">—</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header"><div class="metric-icon">📦</div></div>
+                        <div class="metric-label">Profit/Paket</div>
+                        <div class="metric-value" id="totalProfitPerOrder">—</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header"><div class="metric-icon">🆕</div></div>
+                        <div class="metric-label">Profit (New)</div>
+                        <div class="metric-value" id="totalProfitNew">—</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header"><div class="metric-icon">🔄</div></div>
+                        <div class="metric-label">Profit (Ret)</div>
+                        <div class="metric-value" id="totalProfitRet">—</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header"><div class="metric-icon">📉</div></div>
+                        <div class="metric-label">Profit Margin</div>
+                        <div class="metric-value" id="totalMargin">—</div>
+                    </div>
+                </div>
+                
+                <details class="real-money-dropdown real-money-general">
+                    <summary class="real-money-toggle">💰 Real Money <span class="dropdown-arrow">▼</span></summary>
+                    <div class="metrics-grid metrics-row-4">
+                        <div class="metric-card">
+                            <div class="metric-header"><div class="metric-icon">📦</div></div>
+                            <div class="metric-label">All MK Orders</div>
+                            <div class="metric-value" id="totalAllRealOrders">—</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-header"><div class="metric-icon">💰</div></div>
+                            <div class="metric-label">All Gross</div>
+                            <div class="metric-value text-green" id="totalAllRealGross">—</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-header"><div class="metric-icon">💶</div></div>
+                            <div class="metric-label">All Neto</div>
+                            <div class="metric-value text-green" id="totalAllRealNeto">—</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-header"><div class="metric-icon">🧾</div></div>
+                            <div class="metric-label">All Tax</div>
+                            <div class="metric-value text-amber" id="totalAllRealTax">—</div>
+                        </div>
+                    </div>
+                    <div class="metrics-grid metrics-row-4">
+                        <div class="metric-card">
+                            <div class="metric-header"><div class="metric-icon">✅</div></div>
+                            <div class="metric-label">Paid Orders</div>
+                            <div class="metric-value" id="totalRealOrders">—</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-header"><div class="metric-icon">💰</div></div>
+                            <div class="metric-label">Paid Gross</div>
+                            <div class="metric-value text-green" id="totalRealGross">—</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-header"><div class="metric-icon">💶</div></div>
+                            <div class="metric-label">Paid Neto</div>
+                            <div class="metric-value text-green" id="totalRealNeto">—</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-header"><div class="metric-icon">🧾</div></div>
+                            <div class="metric-label">Paid Tax</div>
+                            <div class="metric-value text-amber" id="totalRealTax">—</div>
+                        </div>
+                    </div>
+                    <div class="metrics-grid metrics-row-4">
+                        <div class="metric-card">
+                            <div class="metric-header"><div class="metric-icon">🏢</div></div>
+                            <div class="metric-label">MK Extra Paid</div>
+                            <div class="metric-value" id="totalExtraPaidOrders">—</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-header"><div class="metric-icon">💰</div></div>
+                            <div class="metric-label">Extra Gross</div>
+                            <div class="metric-value text-green" id="totalExtraPaidGross">—</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-header"><div class="metric-icon">💶</div></div>
+                            <div class="metric-label">Extra Neto</div>
+                            <div class="metric-value text-green" id="totalExtraPaidNeto">—</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-header"><div class="metric-icon">🧾</div></div>
+                            <div class="metric-label">Extra Tax</div>
+                            <div class="metric-value text-amber" id="totalExtraPaidTax">—</div>
+                        </div>
+                    </div>
+                </details>
+                
+                <!-- Data Table -->
+                <div class="table-card">
+                    <div class="table-header">
+                        <div class="table-title">
+                            <span>📋</span>
+                            Daily Breakdown
+                        </div>
+                    </div>
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Spend</th>
+                                    <th>Orders</th>
+                                    <th>CPA All</th>
+                                    <th>ROAS All</th>
+                                    <th>CPA New</th>
+                                    <th>ROAS New</th>
+                                    <th>AOV</th>
+                                    <th>Rev Gross</th>
+                                    <th>Rev w/o Rej</th>
+                                    <th>Rev Neto</th>
+                                    <th>TAX</th>
+                                    <th>Prod Cost</th>
+                                    <th>Prod C/Order</th>
+                                    <th>Ship Cost</th>
+                                    <th>Ship C/Order</th>
+                                    <th>Profit</th>
+                                    <th>Profit/Paket</th>
+                                    <th>Profit New</th>
+                                    <th>Profit Ret</th>
+                                    <th>Profit Margin</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBody">
+                                <tr><td colspan="16" class="loading"><span class="spinner"></span> Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Charts Grid -->
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div class="chart-title">
+                                <span class="chart-icon">📦</span>
+                                Orders by Country
+                            </div>
+                        </div>
+                        <canvas id="ordersChart" height="180"></canvas>
+                    </div>
+                    
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div class="chart-title">
+                                <span class="chart-icon">📈</span>
+                                ROAS Trend
+                            </div>
+                        </div>
+                        <canvas id="roasChart" height="180"></canvas>
+                    </div>
+                    
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div class="chart-title">
+                                <span class="chart-icon">🎯</span>
+                                CPA Trend
+                            </div>
+                        </div>
+                        <canvas id="cpaChart" height="180"></canvas>
+                    </div>
+                    
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div class="chart-title">
+                                <span class="chart-icon">💵</span>
+                                Revenue vs Spend
+                            </div>
+                        </div>
+                        <canvas id="revenueChart" height="180"></canvas>
+                    </div>
+                </div>
+                
+                
+            </div>
+        </main>
+    </div>
+    
+    <script>
+        // Mobile sidebar toggle
+        function toggleSidebar() {
+            document.querySelector('.sidebar').classList.toggle('open');
+            document.querySelector('.sidebar-overlay').classList.toggle('active');
+        }
+
+        function toggleCollapse() {
+            const sidebar = document.querySelector(".sidebar");
+            const btn = document.querySelector(".collapse-btn");
+            sidebar.classList.toggle("collapsed");
+            const isCollapsed = sidebar.classList.contains("collapsed");
+            btn.querySelector(".collapse-text").textContent = isCollapsed ? "Show" : "Hide Menu";
+            btn.querySelector(".collapse-icon").textContent = isCollapsed ? "▶" : "◀";
+            localStorage.setItem("sidebarCollapsed", isCollapsed);
+        }
+
+        // Load saved collapse state
+        if (localStorage.getItem("sidebarCollapsed") === "true") {
+            document.querySelector(".sidebar").classList.add("collapsed");
+            const collapseText = document.querySelector(".collapse-text");
+            const collapseIcon = document.querySelector(".collapse-icon");
+            if (collapseText) collapseText.textContent = "Show";
+            if (collapseIcon) collapseIcon.textContent = "▶";
+        }
+        
+        const flags = { HR: '🇭🇷', CZ: '🇨🇿', PL: '🇵🇱' };
+        const countryNames = { HR: 'Croatia', CZ: 'Czech Republic', PL: 'Poland' };
+        const colors = { HR: '#ef4444', CZ: '#22c55e', PL: '#f59e0b', GR: '#3b82f6', IT: '#a855f7', HU: '#f97316', SK: '#14b8a6' };
+        let charts = {};
+        
+        // Format date as YYYY-MM-DD (local time, not UTC)
+        function formatDate(d) {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        
+        function updateActiveTab(id) {
+            document.querySelectorAll('.preset-tab').forEach(t => t.classList.remove('active'));
+            const tab = document.getElementById('btn-' + id);
+            if (tab) tab.classList.add('active');
+        }
+        
+        // 7D = last 7 days NOT including today
+        function setPreset(days) {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const start = new Date(yesterday);
+            start.setDate(start.getDate() - (days - 1));
+            document.getElementById('startDate').value = formatDate(start);
+            document.getElementById('endDate').value = formatDate(yesterday);
+            updateActiveTab(days + 'd');
+            loadData();
+        }
+        
+        function setDay(which) {
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const target = which === 'today' ? today : yesterday;
+            document.getElementById('startDate').value = formatDate(target);
+            document.getElementById('endDate').value = formatDate(target);
+            updateActiveTab(which);
+            loadData();
+        }
+        
+        function setMonth(which) {
+            const now = new Date();
+            let start, end;
+            if (which === 'current') {
+                start = new Date(now.getFullYear(), now.getMonth(), 1);
+                end = now;
+                updateActiveTab('month');
+            } else {
+                start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                end = new Date(now.getFullYear(), now.getMonth(), 0);
+                updateActiveTab('lastmonth');
+            }
+            document.getElementById('startDate').value = formatDate(start);
+            document.getElementById('endDate').value = formatDate(end);
+            loadData();
+        }
+        
+        function setYear() {
+            const now = new Date();
+            const start = new Date(2026, 0, 1);
+            document.getElementById('startDate').value = formatDate(start);
+            document.getElementById('endDate').value = formatDate(now);
+            updateActiveTab('year');
+            loadData();
+        }
+        
+        // Default: TODAY
+        setDay('today');
+        
+        // Manual refresh - triggers sync then reloads data
+        async function refreshData() {
+            const btn = document.getElementById('refreshBtn');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Syncing...';
+            
+            try {
+                // Trigger sync of today+yesterday only (fast) with 45s timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 45000);
+                try {
+                    const syncRes = await fetch('/dashboard/api/sync?days=2', { signal: controller.signal });
+                    clearTimeout(timeoutId);
+                    const syncData = await syncRes.json();
+                    if (syncData.error) console.warn('Sync warning:', syncData.error);
+                } catch (e) {
+                    clearTimeout(timeoutId);
+                    console.warn('Sync timeout/error, loading cached data:', e.message);
+                }
+                // Always reload data from cache (even if sync timed out)
+                await loadData();
+                btn.innerHTML = '✅ Done!';
+                setTimeout(() => { btn.innerHTML = originalText; }, 2000);
+            } catch (e) {
+                console.error('Refresh failed:', e.message);
+                btn.innerHTML = originalText;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+        
+        async function loadData() {
+            const btn = document.getElementById('loadBtn');
+            const errorDiv = document.getElementById('error');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span>';
+            errorDiv.style.display = 'none';
+            
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            
+            try {
+                const dataController = new AbortController();
+                const dataTimeout = setTimeout(() => dataController.abort(), 30000);
+                const res = await fetch(`/dashboard/api/data?start=${start}&end=${end}`, { signal: dataController.signal });
+                clearTimeout(dataTimeout);
+                if (!res.ok) throw new Error('API error');
+                const data = await res.json();
+                
+                if (data.error) throw new Error(data.error);
+                
+                renderCountrySummary(data);
+                renderTotals(data);
+                renderCharts(data);
+                renderTable(data);
+                loadMetakockaData(start, end, data);
+                
+                if (data.lastUpdate) {
+                    const updated = new Date(data.lastUpdate);
+                    const now = new Date();
+                    const mins = Math.floor((now - updated) / 60000);
+                    document.getElementById('lastUpdated').textContent = mins < 1 ? 'Just now' : mins + 'm ago';
+                    document.getElementById('lastSyncTime').textContent = updated.toLocaleString();
+                }
+                
+                if (data.dates && data.dates.length > 0) {
+                    const startDate = data.dates[0];
+                    const endDate = data.dates[data.dates.length - 1];
+                    document.getElementById('dataRange').textContent = `${startDate} → ${endDate} (${data.dates.length} days)`;
+                }
+            } catch (e) {
+                document.getElementById('errorText').textContent = e.message;
+                errorDiv.style.display = 'flex';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Apply';
+            }
+        }
+        
+        function fmt(n) {
+            return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        
+        function renderCountrySummary(data) {
+            const countryTotals = {};
+            for (const country of data.countries) {
+                countryTotals[country] = { orders: 0, revenueGross: 0, revenueNetEur: 0, effectiveNetEur: 0, spend: 0, newOrders: 0, retOrders: 0, profit: 0, productCost: 0, effectiveProductCost: 0, shippingCost: 0, newRevenueEur: 0, retRevenueEur: 0, rejectionRevLoss: 0 };
+            }
+            
+            for (const date of data.dates) {
+                for (const country of data.countries) {
+                    const d = data.data[date]?.[country];
+                    if (d) {
+                        countryTotals[country].orders += d.orders || 0;
+                        countryTotals[country].revenueGross += d.revenue_gross_eur || 0;
+                        countryTotals[country].revenueNetEur += d.revenue_net_eur || 0;
+                        countryTotals[country].effectiveNetEur += d.effective_net_eur || 0;
+                        countryTotals[country].spend += d.spend || 0;
+                        countryTotals[country].newOrders += d.new_orders || 0;
+                        countryTotals[country].retOrders += d.ret_orders || 0;
+                        countryTotals[country].profit += d.profit || 0;
+                        countryTotals[country].productCost += d.product_cost || 0;
+                        countryTotals[country].effectiveProductCost += d.effective_product_cost || d.product_cost || 0;
+                        countryTotals[country].shippingCost += d.shipping_cost || 0;
+                        countryTotals[country].newRevenueEur += d.new_revenue_eur || 0;
+                        countryTotals[country].retRevenueEur += d.ret_revenue_eur || 0;
+                        // Revenue loss from rejections
+                        const rejRate = d.rejection_rate || 0;
+                        countryTotals[country].rejectionRevLoss += (d.revenue_gross_eur || 0) * rejRate;
+                    }
+                }
+            }
+            
+            for (const country of data.countries) {
+                const t = countryTotals[country];
+                const roas = t.spend > 0 ? t.revenueGross / t.spend : 0;
+                const cpa = t.orders > 0 ? t.spend / t.orders : 0;
+                const ppo = t.orders > 0 ? t.profit / t.orders : 0;
+                const code = country.toLowerCase();
+                
+                const revGrossNoRej = t.revenueGross - t.rejectionRevLoss;
+                const tax = revGrossNoRej - t.effectiveNetEur;
+                const costPerOrder = t.orders > 0 ? (t.effectiveProductCost + t.shippingCost) / t.orders : 0;
+                const newTotalCost = costPerOrder * t.newOrders;
+                const retTotalCost = costPerOrder * t.retOrders;
+                const profitNew = t.newRevenueEur - t.spend - newTotalCost;
+                const profitRet = t.retRevenueEur - retTotalCost;
+                
+                document.getElementById(`${code}-orders`).innerHTML = `${t.orders} <span style="font-size: 10px; font-weight: 400; color: var(--text-muted);">(${t.newOrders} new · ${t.retOrders} ret)</span>`;
+                document.getElementById(`${code}-spend`).textContent = '€' + t.spend.toFixed(2);
+                
+                // Revenue fields
+                document.getElementById(`${code}-revgross`).textContent = '€' + t.revenueGross.toFixed(2);
+                document.getElementById(`${code}-revnorej`).textContent = '€' + revGrossNoRej.toFixed(2);
+                document.getElementById(`${code}-revneto`).textContent = '€' + t.effectiveNetEur.toFixed(2);
+                document.getElementById(`${code}-tax`).textContent = '€' + tax.toFixed(2);
+                
+                document.getElementById(`${code}-productcost`).textContent = '€' + t.productCost.toFixed(2);
+                document.getElementById(`${code}-shippingcost`).textContent = '€' + t.shippingCost.toFixed(2);
+                document.getElementById(`${code}-prodcostorder`).textContent = t.orders > 0 ? '€' + (t.productCost / t.orders).toFixed(2) : '—';
+                document.getElementById(`${code}-shipcostorder`).textContent = t.orders > 0 ? '€' + (t.shippingCost / t.orders).toFixed(2) : '—';
+                
+                // Real Money - leave empty for now, will be populated later
+                document.getElementById(`${code}-cpa`).textContent = t.orders > 0 ? '€' + cpa.toFixed(2) : '—';
+                const aov = t.orders > 0 ? t.revenueGross / t.orders : 0;
+                document.getElementById(`${code}-aov`).textContent = t.orders > 0 ? '€' + aov.toFixed(2) : '—';
+                
+                const profitEl = document.getElementById(`${code}-profit`);
+                profitEl.textContent = (t.profit >= 0 ? '+' : '') + '€' + Math.round(t.profit).toLocaleString();
+                profitEl.style.color = t.profit >= 0 ? 'var(--success)' : 'var(--danger)';
+                
+                const profitNewEl = document.getElementById(`${code}-profitnew`);
+                profitNewEl.textContent = (profitNew >= 0 ? '+' : '') + '€' + Math.round(profitNew).toLocaleString();
+                profitNewEl.style.color = profitNew >= 0 ? 'var(--success)' : 'var(--danger)';
+                
+                const profitRetEl = document.getElementById(`${code}-profitret`);
+                profitRetEl.textContent = (profitRet >= 0 ? '+' : '') + '€' + Math.round(profitRet).toLocaleString();
+                profitRetEl.style.color = profitRet >= 0 ? 'var(--success)' : 'var(--danger)';
+                
+                const ppoEl = document.getElementById(`${code}-ppo`);
+                ppoEl.textContent = t.orders > 0 ? ((ppo >= 0 ? '+' : '') + '€' + ppo.toFixed(2)) : '—';
+                ppoEl.style.color = ppo >= 0 ? 'var(--success)' : 'var(--danger)';
+                
+                const roasEl = document.getElementById(`${code}-roas`);
+                roasEl.textContent = roas.toFixed(2) + 'x';
+                roasEl.className = 'country-roas ' + (roas >= 2 ? 'text-green' : roas >= 1 ? 'text-amber' : 'text-red');
+            }
+        }
+        
+        function renderTotals(data) {
+            let spend = 0, orders = 0, revenueGross = 0, revenueNet = 0, effectiveNetTotal = 0, rejectionRevLoss = 0, newOrders = 0, retOrders = 0, newCustomers = 0, tshirts = 0, boxers = 0, socks = 0, productCost = 0, effectiveProductCost = 0, shippingCost = 0, profit = 0, newRevenueEur = 0, retRevenueEur = 0, newRevenueGrossEur = 0;
+            
+            for (const date of data.dates) {
+                for (const country of data.countries) {
+                    const d = data.data[date]?.[country];
+                    if (d) {
+                        spend += d.spend || 0;
+                        orders += d.orders || 0;
+                        revenueGross += d.revenue_gross_eur || 0;
+                        revenueNet += d.revenue_net_eur || 0;
+                        newOrders += d.new_orders || 0;
+                        retOrders += d.ret_orders || 0;
+                        newCustomers += d.new || 0;
+                        tshirts += d.tshirts || 0;
+                        boxers += d.boxers || 0;
+                        socks += d.socks || 0;
+                        productCost += d.product_cost || 0;
+                        effectiveProductCost += d.effective_product_cost || d.product_cost || 0;
+                        shippingCost += d.shipping_cost || 0;
+                        profit += d.profit || 0;
+                        newRevenueEur += d.new_revenue_eur || 0;
+                        retRevenueEur += d.ret_revenue_eur || 0;
+                        effectiveNetTotal += d.effective_net_eur || 0;
+                        const rejRate = d.rejection_rate || 0;
+                        rejectionRevLoss += (d.revenue_gross_eur || 0) * rejRate;
+                        const vatRate = d.vat_rate || 0.25;
+                        newRevenueGrossEur += (d.new_revenue_eur || 0) * (1 + vatRate);
+                    }
+                }
+            }
+            
+            const roas = spend > 0 ? revenueGross / spend : 0;
+            const roasNew = spend > 0 && newRevenueGrossEur > 0 ? newRevenueGrossEur / spend : 0;
+            const margin = effectiveNetTotal > 0 ? (profit / effectiveNetTotal) * 100 : 0;
+            
+            const costPerOrder = orders > 0 ? (effectiveProductCost + shippingCost) / orders : 0;
+            const newTotalCost = costPerOrder * newOrders;
+            const retTotalCost = costPerOrder * retOrders;
+            const profitNew = newRevenueEur - spend - newTotalCost;
+            const profitRet = retRevenueEur - retTotalCost;
+            
+            document.getElementById('totalSpend').textContent = `€${fmt(spend)}`;
+            document.getElementById('totalOrders').textContent = orders.toLocaleString();
+            document.getElementById('totalNewRet').textContent = `${newOrders} new · ${retOrders} ret`;
+            const revGrossNoRej = revenueGross - rejectionRevLoss;
+            const totalTax = revGrossNoRej - effectiveNetTotal;
+            
+            document.getElementById('totalRevenueGross').textContent = `€${fmt(revenueGross)}`;
+            document.getElementById('totalRevNoRej').textContent = `€${fmt(revGrossNoRej)}`;
+            document.getElementById('totalRevenue').textContent = `€${fmt(effectiveNetTotal)}`;
+            document.getElementById('totalTax').textContent = `€${fmt(totalTax)}`;
+            document.getElementById('totalCPA').textContent = orders > 0 ? `€${(spend / orders).toFixed(2)}` : '—';
+            document.getElementById('totalCPANew').textContent = newCustomers > 0 ? `€${(spend / newCustomers).toFixed(2)}` : '—';
+            
+            const roasEl = document.getElementById('totalROAS');
+            roasEl.textContent = spend > 0 ? roas.toFixed(2) + 'x' : '—';
+            roasEl.className = 'metric-value ' + (roas >= 2 ? 'text-green' : roas >= 1 ? 'text-amber' : 'text-red');
+            
+            const roasNewEl = document.getElementById('totalROASNew');
+            roasNewEl.textContent = roasNew > 0 ? roasNew.toFixed(2) + 'x' : '—';
+            roasNewEl.className = 'metric-value ' + (roasNew >= 2 ? 'text-green' : roasNew >= 1 ? 'text-amber' : 'text-red');
+            
+            const totalAov = orders > 0 ? revenueGross / orders : 0;
+            document.getElementById('totalAOV').textContent = orders > 0 ? '€' + totalAov.toFixed(2) : '—';
+            
+            document.getElementById('totalProductCost').textContent = `€${fmt(productCost)}`;
+            document.getElementById('totalProducts').textContent = `👕${tshirts} · 🩲${boxers}` + (socks > 0 ? ` · 🧦${socks}` : '');
+            document.getElementById('totalProdCostOrder').textContent = orders > 0 ? `€${(productCost / orders).toFixed(2)}` : '—';
+            
+            // Real Money totals - leave empty for now, will be populated later
+            document.getElementById('totalShippingCost').textContent = `€${fmt(shippingCost)}`;
+            document.getElementById('totalShipCostOrder').textContent = orders > 0 ? `€${(shippingCost / orders).toFixed(2)}` : '—';
+            
+            const profitEl = document.getElementById('totalProfit');
+            profitEl.textContent = `€${fmt(profit)}`;
+            profitEl.className = 'metric-value ' + (profit > 0 ? 'text-green' : 'text-red');
+            
+            const profitNewEl = document.getElementById('totalProfitNew');
+            profitNewEl.textContent = `€${fmt(profitNew)}`;
+            profitNewEl.className = 'metric-value ' + (profitNew > 0 ? 'text-green' : 'text-red');
+            
+            const profitRetEl = document.getElementById('totalProfitRet');
+            profitRetEl.textContent = `€${fmt(profitRet)}`;
+            profitRetEl.className = 'metric-value ' + (profitRet > 0 ? 'text-green' : 'text-red');
+            
+            const marginEl = document.getElementById('totalMargin');
+            marginEl.textContent = effectiveNetTotal > 0 ? margin.toFixed(1) + '%' : '—';
+            marginEl.className = 'metric-value ' + (margin >= 20 ? 'text-green' : margin >= 10 ? 'text-amber' : 'text-red');
+            
+            const profitPerOrder = orders > 0 ? profit / orders : 0;
+            const profitPerOrderEl = document.getElementById('totalProfitPerOrder');
+            profitPerOrderEl.textContent = orders > 0 ? ((profitPerOrder >= 0 ? '+' : '') + '€' + profitPerOrder.toFixed(2)) : '—';
+            profitPerOrderEl.className = 'metric-value ' + (profitPerOrder >= 0 ? 'text-green' : 'text-red');
+        }
+        
+        function renderCharts(data) {
+            const dates = data.dates;
+            const gridColor = 'rgba(0,0,0,0.05)';
+            const tickColor = '#64748b';
+            
+            const chartFont = { family: 'Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto', size: 11 };
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: true,
+                interaction: { intersect: false, mode: 'index' },
+                plugins: {
+                    legend: {
+                        labels: { color: tickColor, usePointStyle: true, padding: 14, font: chartFont, boxWidth: 8 }
+                    },
+                    tooltip: {
+                        backgroundColor: '#ffffff',
+                        titleColor: '#1e293b',
+                        bodyColor: '#475569',
+                        borderColor: '#e2e8f0',
+                        borderWidth: 1,
+                        cornerRadius: 6,
+                        padding: 12,
+                        titleFont: { size: 12, weight: 600 },
+                        bodyFont: { size: 12 }
+                    }
+                },
+                scales: {
+                    x: { ticks: { color: tickColor, font: chartFont, maxRotation: 0 }, grid: { color: gridColor, drawBorder: false } },
+                    y: { ticks: { color: tickColor, font: chartFont }, grid: { color: gridColor, drawBorder: false } }
+                }
+            };
+            
+            Object.values(charts).forEach(c => c.destroy());
+            
+            charts.orders = new Chart(document.getElementById('ordersChart'), {
+                type: 'bar',
+                data: {
+                    labels: dates,
+                    datasets: data.countries.map(c => ({
+                        label: c,
+                        data: dates.map(d => data.data[d]?.[c]?.orders || 0),
+                        backgroundColor: colors[c],
+                        borderRadius: 4,
+                        borderSkipped: false
+                    }))
+                },
+                options: { ...chartOptions, scales: { ...chartOptions.scales, x: { ...chartOptions.scales.x, stacked: true }, y: { ...chartOptions.scales.y, stacked: true } } }
+            });
+            
+            charts.roas = new Chart(document.getElementById('roasChart'), {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: data.countries.map(c => ({
+                        label: c,
+                        data: dates.map(d => data.data[d]?.[c]?.roas || 0),
+                        borderColor: colors[c],
+                        backgroundColor: colors[c] + '15',
+                        tension: 0.4,
+                        fill: true,
+                        borderWidth: 2.5,
+                        pointRadius: 0,
+                        pointHoverRadius: 5
+                    }))
+                },
+                options: chartOptions
+            });
+            
+            charts.cpa = new Chart(document.getElementById('cpaChart'), {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: data.countries.map(c => ({
+                        label: c,
+                        data: dates.map(d => data.data[d]?.[c]?.cpa || 0),
+                        borderColor: colors[c],
+                        tension: 0.4,
+                        borderWidth: 2.5,
+                        pointRadius: 0,
+                        pointHoverRadius: 5
+                    }))
+                },
+                options: chartOptions
+            });
+            
+            const totalRevenue = dates.map(d => data.countries.reduce((s, c) => s + (data.data[d]?.[c]?.revenue_net_eur || 0), 0));
+            const totalSpend = dates.map(d => data.countries.reduce((s, c) => s + (data.data[d]?.[c]?.spend || 0), 0));
+            
+            charts.revenue = new Chart(document.getElementById('revenueChart'), {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        { label: 'Revenue', data: totalRevenue, borderColor: '#22c55e', backgroundColor: 'rgba(34, 197, 94, 0.1)', tension: 0.4, fill: true, borderWidth: 2.5, pointRadius: 0 },
+                        { label: 'Spend', data: totalSpend, borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', tension: 0.4, fill: true, borderWidth: 2.5, pointRadius: 0 }
+                    ]
+                },
+                options: chartOptions
+            });
+        }
+        
+        function renderTable(data) {
+            const tbody = document.getElementById('tableBody');
+            let html = '';
+            
+            for (const date of [...data.dates].reverse()) {
+                let orders = 0, newCustomers = 0, tshirts = 0, boxers = 0, socks = 0;
+                let revenueGrossEur = 0, effectiveNetEur = 0, rejRevLoss = 0, newRevenueEur = 0, retRevenueEur = 0, newRevenueGrossEur = 0;
+                let spend = 0, productCost = 0, effectiveProductCost = 0, shippingCost = 0, profit = 0, newOrders = 0, retOrders = 0;
+                
+                for (const country of data.countries) {
+                    const d = data.data[date]?.[country];
+                    if (!d) continue;
+                    orders += d.orders || 0;
+                    newCustomers += d.new || 0;
+                    newOrders += d.new_orders || 0;
+                    retOrders += d.ret_orders || 0;
+                    revenueGrossEur += d.revenue_gross_eur || 0;
+                    effectiveNetEur += d.effective_net_eur || 0;
+                    const rejRate = d.rejection_rate || 0;
+                    rejRevLoss += (d.revenue_gross_eur || 0) * rejRate;
+                    newRevenueEur += d.new_revenue_eur || 0;
+                    retRevenueEur += d.ret_revenue_eur || 0;
+                    spend += d.spend || 0;
+                    productCost += d.product_cost || 0;
+                    effectiveProductCost += d.effective_product_cost || d.product_cost || 0;
+                    shippingCost += d.shipping_cost || 0;
+                    profit += d.profit || 0;
+                    const vatRate = d.vat_rate || 0.25;
+                    newRevenueGrossEur += (d.new_revenue_eur || 0) * (1 + vatRate);
+                }
+                
+                const cpa = orders > 0 ? spend / orders : null;
+                const cpaNew = newCustomers > 0 ? spend / newCustomers : null;
+                const roas = spend > 0 ? revenueGrossEur / spend : null;
+                const roasNew = spend > 0 && newRevenueGrossEur > 0 ? newRevenueGrossEur / spend : null;
+                const revGrossNoRej = revenueGrossEur - rejRevLoss;
+                const tax = revGrossNoRej - effectiveNetEur;
+                const prodCostOrder = orders > 0 ? productCost / orders : 0;
+                const shipCostOrder = orders > 0 ? shippingCost / orders : 0;
+                
+                const costPerOrder = orders > 0 ? (effectiveProductCost + shippingCost) / orders : 0;
+                const newTotalCost = costPerOrder * newOrders;
+                const retTotalCost = costPerOrder * retOrders;
+                const profitNew = newRevenueEur - spend - newTotalCost;
+                const profitRet = retRevenueEur - retTotalCost;
+                const profitPerOrder = orders > 0 ? profit / orders : 0;
+                const margin = effectiveNetEur > 0 ? (profit / effectiveNetEur) * 100 : 0;
+                
+                const roasClass = roas >= 2 ? 'text-green' : roas >= 1 ? 'text-amber' : 'text-red';
+                const roasNewClass = roasNew >= 2 ? 'text-green' : roasNew >= 1 ? 'text-amber' : 'text-red';
+                const profitClass = profit >= 0 ? 'text-green' : 'text-red';
+                const profitNewClass = profitNew >= 0 ? 'text-green' : 'text-red';
+                const profitRetClass = profitRet >= 0 ? 'text-green' : 'text-red';
+                const marginClass = margin >= 20 ? 'text-green' : margin >= 10 ? 'text-amber' : 'text-red';
+                
+                html += `<tr>
+                    <td><strong>${date}</strong></td>
+                    <td>€${spend.toFixed(2)}</td>
+                    <td><strong>${orders}</strong></td>
+                    <td>${cpa !== null ? '€' + cpa.toFixed(2) : '—'}</td>
+                    <td class="${roasClass}" style="font-weight: 600;">${roas !== null ? roas.toFixed(2) + 'x' : '—'}</td>
+                    <td>${cpaNew !== null ? '€' + cpaNew.toFixed(2) : '—'}</td>
+                    <td class="${roasNewClass}" style="font-weight: 600;">${roasNew !== null ? roasNew.toFixed(2) + 'x' : '—'}</td>
+                    <td>${orders > 0 ? '€' + (revenueGrossEur / orders).toFixed(2) : '—'}</td>
+                    <td>€${revenueGrossEur.toFixed(2)}</td>
+                    <td>€${revGrossNoRej.toFixed(2)}</td>
+                    <td>€${effectiveNetEur.toFixed(2)}</td>
+                    <td>€${tax.toFixed(2)}</td>
+                    <td>€${productCost.toFixed(2)}</td>
+                    <td>€${prodCostOrder.toFixed(2)}</td>
+                    <td>€${shippingCost.toFixed(2)}</td>
+                    <td>€${shipCostOrder.toFixed(2)}</td>
+                    <td class="${profitClass}" style="font-weight: 700;">€${profit.toFixed(2)}</td>
+                    <td class="${profitClass}" style="font-weight: 600;">${orders > 0 ? '€' + profitPerOrder.toFixed(2) : '—'}</td>
+                    <td class="${profitNewClass}" style="font-weight: 500;">€${profitNew.toFixed(2)}</td>
+                    <td class="${profitRetClass}" style="font-weight: 500;">€${profitRet.toFixed(2)}</td>
+                    <td class="${marginClass}" style="font-weight: 600;">${margin.toFixed(1)}%</td>
+                </tr>`;
+            }
+            
+            tbody.innerHTML = html || '<tr><td colspan="20" class="loading">No data for selected period</td></tr>';
+        }
+        
+        async function logout() {
+            await fetch('/dashboard/api/logout');
+            window.location.href = '/dashboard/login';
+        }
+        
+        async function loadMetakockaData(start, end, mainData) {
+            try {
+                // Use MK data from main API response (same WC order base)
+                if (!mainData || !mainData.data) return;
+                
+                // Calculate totals per country from mainData
+                const countryTotals = {};
+                let totalGross = 0, totalNeto = 0, totalTax = 0;
+                let totalAllGross = 0, totalAllNeto = 0, totalAllTax = 0;
+                
+                for (const [date, countries] of Object.entries(mainData.data)) {
+                    for (const [country, vals] of Object.entries(countries)) {
+                        if (!countryTotals[country]) countryTotals[country] = { orders: 0, gross: 0, neto: 0, tax: 0, allOrders: 0, allGross: 0, allNeto: 0, allTax: 0, extraOrders: 0, extraGross: 0, extraNeto: 0, extraTax: 0 };
+                        countryTotals[country].orders += vals.mk_paid_orders || 0;
+                        countryTotals[country].gross += vals.mk_paid_gross || 0;
+                        countryTotals[country].neto += vals.mk_paid_neto || 0;
+                        countryTotals[country].tax += vals.mk_paid_tax || 0;
+                        countryTotals[country].allOrders += vals.mk_all_orders || 0;
+                        countryTotals[country].allGross += vals.mk_all_gross || 0;
+                        countryTotals[country].allNeto += vals.mk_all_neto || 0;
+                        countryTotals[country].allTax += vals.mk_all_tax || 0;
+                        countryTotals[country].extraOrders += vals.mk_extra_paid_orders || 0;
+                        countryTotals[country].extraGross += vals.mk_extra_paid_gross || 0;
+                        countryTotals[country].extraNeto += vals.mk_extra_paid_neto || 0;
+                        countryTotals[country].extraTax += vals.mk_extra_paid_tax || 0;
+                        totalGross += vals.mk_paid_gross || 0;
+                        totalNeto += vals.mk_paid_neto || 0;
+                        totalTax += vals.mk_paid_tax || 0;
+                        totalAllGross += vals.mk_all_gross || 0;
+                        totalAllNeto += vals.mk_all_neto || 0;
+                        totalAllTax += vals.mk_all_tax || 0;
+                    }
+                }
+                
+                // Update country Real Money cards
+                const countries = ['HR', 'CZ', 'PL', 'GR', 'IT', 'HU', 'SK'];
+                for (const c of countries) {
+                    const code = c.toLowerCase();
+                    const t = countryTotals[c] || { orders: 0, gross: 0, neto: 0, tax: 0, allOrders: 0, allGross: 0, allNeto: 0, allTax: 0 };
+                    // All MK orders row
+                    const a0 = document.getElementById(`${code}-allrealorders`);
+                    const a1 = document.getElementById(`${code}-allrealgross`);
+                    const a2 = document.getElementById(`${code}-allrealneto`);
+                    const a3 = document.getElementById(`${code}-allrealtax`);
+                    if (a0) a0.textContent = (t.allOrders || 0).toLocaleString();
+                    if (a1) a1.textContent = '€' + (t.allGross || 0).toFixed(2);
+                    if (a2) a2.textContent = '€' + (t.allNeto || 0).toFixed(2);
+                    if (a3) a3.textContent = '€' + (t.allTax || 0).toFixed(2);
+                    // Paid orders row
+                    const el0 = document.getElementById(`${code}-realorders`);
+                    const el1 = document.getElementById(`${code}-realgross`);
+                    const el2 = document.getElementById(`${code}-realneto`);
+                    const el3 = document.getElementById(`${code}-realtax`);
+                    if (el0) el0.textContent = (t.orders || 0).toLocaleString();
+                    if (el1) el1.textContent = '€' + t.gross.toFixed(2);
+                    if (el2) el2.textContent = '€' + t.neto.toFixed(2);
+                    if (el3) el3.textContent = '€' + t.tax.toFixed(2);
+                    // MK Extra Paid row
+                    const x0 = document.getElementById(`${code}-extrapaidorders`);
+                    const x1 = document.getElementById(`${code}-extrapaidgross`);
+                    const x2 = document.getElementById(`${code}-extrapaidneto`);
+                    const x3 = document.getElementById(`${code}-extrapaidtax`);
+                    if (x0) x0.textContent = (t.extraOrders || 0).toLocaleString();
+                    if (x1) x1.textContent = '€' + (t.extraGross || 0).toFixed(2);
+                    if (x2) x2.textContent = '€' + (t.extraNeto || 0).toFixed(2);
+                    if (x3) x3.textContent = '€' + (t.extraTax || 0).toFixed(2);
+                }
+                
+                // Update general Real Money cards
+                let totalRealOrders = 0, totalAllRealOrders = 0;
+                for (const ct of Object.values(countryTotals)) {
+                    totalRealOrders += ct.orders;
+                    totalAllRealOrders += ct.allOrders;
+                }
+                // All MK orders
+                const ga0 = document.getElementById('totalAllRealOrders');
+                if (ga0) ga0.textContent = totalAllRealOrders.toLocaleString();
+                const ga1 = document.getElementById('totalAllRealGross');
+                const ga2 = document.getElementById('totalAllRealNeto');
+                const ga3 = document.getElementById('totalAllRealTax');
+                if (ga1) ga1.textContent = `€${totalAllGross.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                if (ga2) ga2.textContent = `€${totalAllNeto.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                if (ga3) ga3.textContent = `€${totalAllTax.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                // Paid orders
+                const g0 = document.getElementById('totalRealOrders');
+                if (g0) g0.textContent = totalRealOrders.toLocaleString();
+                const g1 = document.getElementById('totalRealGross');
+                const g2 = document.getElementById('totalRealNeto');
+                const g3 = document.getElementById('totalRealTax');
+                if (g1) g1.textContent = `€${totalGross.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                if (g2) g2.textContent = `€${totalNeto.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                if (g3) g3.textContent = `€${totalTax.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                // MK Extra Paid totals
+                let totalExtraOrders = 0, totalExtraGross = 0, totalExtraNeto = 0, totalExtraTax = 0;
+                for (const ct of Object.values(countryTotals)) {
+                    totalExtraOrders += ct.extraOrders || 0;
+                    totalExtraGross += ct.extraGross || 0;
+                    totalExtraNeto += ct.extraNeto || 0;
+                    totalExtraTax += ct.extraTax || 0;
+                }
+                const xe0 = document.getElementById('totalExtraPaidOrders');
+                if (xe0) xe0.textContent = totalExtraOrders.toLocaleString();
+                const xe1 = document.getElementById('totalExtraPaidGross');
+                const xe2 = document.getElementById('totalExtraPaidNeto');
+                const xe3 = document.getElementById('totalExtraPaidTax');
+                if (xe1) xe1.textContent = `€${totalExtraGross.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                if (xe2) xe2.textContent = `€${totalExtraNeto.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                if (xe3) xe3.textContent = `€${totalExtraTax.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                
+            } catch (e) {
+                console.log('MK data not available:', e.message);
+            }
+        }
+        
+        window.addEventListener('DOMContentLoaded', () => setDay('today'));
+    </script>
+<script src="/dashboard/sidebar.js"></script>
+    <script>renderSidebar('dashboard');</script>
+</body>
+</html>

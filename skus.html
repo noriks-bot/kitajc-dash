@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SKU Management - Noriks Analytics</title>
+    <link rel="stylesheet" href="/dashboard/styles.css?v=20260224b">
+</head>
+<body>
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <aside class="sidebar"></aside>
+    
+    <main class="main">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+                <h1 class="page-title">📦 SKU Management</h1>
+            </div>
+            <div class="topbar-right">
+                <button class="theme-toggle" onclick="toggleTheme()">
+                    <span id="themeIcon">🌙</span>
+                    <span id="themeText">Dark</span>
+                </button>
+            </div>
+        </header>
+        
+        <div class="content">
+            <div class="info-card" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+                <div style="display: flex; gap: 24px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="badge badge-primary">👕 T-shirt</span>
+                        <span style="font-weight: 700;">€<span id="cost-tshirt">3.50</span></span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="badge badge-green">🩲 Boxers</span>
+                        <span style="font-weight: 700;">€<span id="cost-boxers">2.25</span></span>
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="recalculate()">🔄 Recalculate All</button>
+            </div>
+            
+            <div style="margin-bottom: 24px;">
+                <input type="text" class="search-input" style="max-width: 400px; width: 100%;" id="search" placeholder="Search products..." oninput="filterProducts()">
+            </div>
+            
+            <div class="table-card">
+                <div class="table-scroll">
+                    <div id="content">
+                        <div class="loading"><span class="spinner"></span> Loading products...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <script>
+        // Theme toggle
+        function toggleTheme() {
+            const html = document.documentElement;
+            const current = html.getAttribute('data-theme');
+            const newTheme = current === 'light' ? 'dark' : 'light';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeUI(newTheme);
+        }
+        
+        function updateThemeUI(theme) {
+            document.getElementById('themeIcon').textContent = theme === 'light' ? '☀️' : '🌙';
+            document.getElementById('themeText').textContent = theme === 'light' ? 'Light' : 'Dark';
+        }
+        
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        updateThemeUI(savedTheme);
+        
+        function toggleSidebar() {
+
+        function toggleCollapse() {
+            const sidebar = document.querySelector(".sidebar");
+            const btn = document.querySelector(".collapse-btn");
+            sidebar.classList.toggle("collapsed");
+            const isCollapsed = sidebar.classList.contains("collapsed");
+            btn.querySelector(".collapse-text").textContent = isCollapsed ? "Show" : "Hide Menu";
+            btn.querySelector(".collapse-icon").textContent = isCollapsed ? "▶" : "◀";
+            localStorage.setItem("sidebarCollapsed", isCollapsed);
+        }
+
+        // Load saved collapse state
+        if (localStorage.getItem("sidebarCollapsed") === "true") {
+            document.querySelector(".sidebar").classList.add("collapsed");
+            const collapseText = document.querySelector(".collapse-text");
+            const collapseIcon = document.querySelector(".collapse-icon");
+            if (collapseText) collapseText.textContent = "Show";
+            if (collapseIcon) collapseIcon.textContent = "▶";
+        }
+            document.querySelector('.sidebar').classList.toggle('open');
+            document.querySelector('.sidebar-overlay').classList.toggle('open');
+        }
+        
+        let allProducts = [];
+        let COSTS = { tshirt: 3.5, boxers: 2.25 };
+        
+        async function loadProducts() {
+            try {
+                const res = await fetch('/dashboard/api/skus?days=30');
+                const data = await res.json();
+                
+                if (data.costs) {
+                    COSTS = data.costs;
+                    document.getElementById('cost-tshirt').textContent = COSTS.tshirt.toFixed(2);
+                    document.getElementById('cost-boxers').textContent = COSTS.boxers.toFixed(2);
+                }
+                
+                allProducts = data.products || [];
+                renderProducts(allProducts);
+            } catch (e) {
+                document.getElementById('content').innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
+            }
+        }
+        
+        function filterProducts() {
+            const query = document.getElementById('search').value.toLowerCase();
+            const filtered = allProducts.filter(p => p.name.toLowerCase().includes(query));
+            renderProducts(filtered);
+        }
+        
+        function calcCost(p) {
+            const eff = p.override || p.autoDetect;
+            return (eff.tshirts || 0) * COSTS.tshirt + (eff.boxers || 0) * COSTS.boxers;
+        }
+        
+        function renderProducts(products) {
+            if (!products.length) {
+                document.getElementById('content').innerHTML = '<div class="loading">No products found</div>';
+                return;
+            }
+            
+            let html = `<table style="min-width: 800px;">
+                <thead>
+                    <tr>
+                        <th>Product Name</th>
+                        <th>Sold</th>
+                        <th>Contents</th>
+                        <th>Cost</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+            
+            for (const p of products) {
+                const eff = p.override || p.autoDetect;
+                const tshirts = eff.tshirts || 0;
+                const boxers = eff.boxers || 0;
+                const cost = calcCost(p);
+                const status = p.override ? '<span class="badge badge-amber">Override</span>' : '<span class="badge" style="background: var(--bg-overlay); color: var(--text-muted);">Auto</span>';
+                
+                let contents = '<div style="display: flex; gap: 6px;">';
+                if (tshirts > 0) contents += `<span class="badge badge-primary">${tshirts}× 👕</span>`;
+                if (boxers > 0) contents += `<span class="badge badge-green">${boxers}× 🩲</span>`;
+                if (tshirts === 0 && boxers === 0) contents += '<span style="color: var(--text-muted);">—</span>';
+                contents += '</div>';
+                
+                html += `
+                    <tr id="row-${encodeId(p.name)}">
+                        <td style="font-weight: 600;">${escapeHtml(p.name)}</td>
+                        <td style="color: var(--text-muted);">${p.count}×</td>
+                        <td>${contents}</td>
+                        <td style="font-weight: 700; color: var(--accent-green);">€${cost.toFixed(2)}</td>
+                        <td>${status}</td>
+                        <td>
+                            <div class="actions">
+                                <button class="btn btn-sm btn-edit" onclick="showEdit('${encodeId(p.name)}')">Edit</button>
+                                ${p.override ? `<button class="btn btn-sm btn-reset" onclick="resetOverride('${escapeJs(p.name)}')">Reset</button>` : ''}
+                            </div>
+                        </td>
+                    </tr>
+                    <tr id="edit-${encodeId(p.name)}" style="display: none;">
+                        <td colspan="6" style="background: var(--bg-overlay); padding: 20px;">
+                            <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                                <strong>${escapeHtml(p.name)}</strong>
+                                <label>T-shirts: <input type="number" class="edit-input" style="width: 80px;" id="tshirts-${encodeId(p.name)}" value="${tshirts}" min="0" max="50"></label>
+                                <label>Boxers: <input type="number" class="edit-input" style="width: 80px;" id="boxers-${encodeId(p.name)}" value="${boxers}" min="0" max="50"></label>
+                                <span style="font-weight: 700; color: var(--accent-green);" id="preview-${encodeId(p.name)}">€${cost.toFixed(2)}</span>
+                                <button class="btn btn-sm btn-save" onclick="saveOverride('${escapeJs(p.name)}')">Save</button>
+                                <button class="btn btn-sm btn-cancel" onclick="hideEdit('${encodeId(p.name)}')">Cancel</button>
+                            </div>
+                        </td>
+                    </tr>`;
+            }
+            
+            html += '</tbody></table>';
+            document.getElementById('content').innerHTML = html;
+            
+            for (const p of products) {
+                const id = encodeId(p.name);
+                const tInput = document.getElementById('tshirts-' + id);
+                const bInput = document.getElementById('boxers-' + id);
+                const preview = document.getElementById('preview-' + id);
+                if (tInput && bInput && preview) {
+                    const update = () => {
+                        const cost = (parseInt(tInput.value) || 0) * COSTS.tshirt + (parseInt(bInput.value) || 0) * COSTS.boxers;
+                        preview.textContent = '€' + cost.toFixed(2);
+                    };
+                    tInput.oninput = update;
+                    bInput.oninput = update;
+                }
+            }
+        }
+        
+        function encodeId(name) { return btoa(encodeURIComponent(name)).replace(/[+/=]/g, '_'); }
+        function escapeHtml(str) { return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+        function escapeJs(str) { return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+        function showEdit(id) { document.getElementById('edit-' + id).style.display = 'table-row'; }
+        function hideEdit(id) { document.getElementById('edit-' + id).style.display = 'none'; }
+        
+        async function saveOverride(name) {
+            const id = encodeId(name);
+            const tshirts = parseInt(document.getElementById('tshirts-' + id).value) || 0;
+            const boxers = parseInt(document.getElementById('boxers-' + id).value) || 0;
+            try {
+                const res = await fetch('/dashboard/api/skus', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, tshirts, boxers })
+                });
+                const data = await res.json();
+                if (data.ok) loadProducts();
+                else alert('Error: ' + (data.error || 'Unknown'));
+            } catch (e) { alert('Error: ' + e.message); }
+        }
+        
+        async function resetOverride(name) {
+            if (!confirm('Reset to auto-detection?')) return;
+            try {
+                const res = await fetch('/dashboard/api/skus?name=' + encodeURIComponent(name), { method: 'DELETE' });
+                const data = await res.json();
+                if (data.ok) loadProducts();
+            } catch (e) { alert('Error: ' + e.message); }
+        }
+        
+        async function recalculate() {
+            if (!confirm('Recalculate all data with current SKU settings?')) return;
+            try {
+                document.getElementById('content').innerHTML = '<div class="loading"><span class="spinner"></span> Recalculating...</div>';
+                await fetch('/dashboard/api/sync?days=30');
+                loadProducts();
+                alert('Done!');
+            } catch (e) {
+                alert('Error: ' + e.message);
+                loadProducts();
+            }
+        }
+        
+        async function logout() {
+            await fetch('/dashboard/api/logout');
+            window.location.href = '/dashboard/login';
+        }
+        
+        loadProducts();
+    </script>
+<script src="/dashboard/sidebar.js"></script>
+    <script>renderSidebar('skus');</script>
+</body>
+</html>

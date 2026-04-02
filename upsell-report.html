@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upsell Report - Noriks Analytics</title>
+    <link rel="stylesheet" href="/dashboard/styles.css?v=20260318">
+    <style>
+        .upsell-type-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 100px;
+        }
+        .upsell-type-badge.sidecart { background: rgba(168,85,247,0.15); color: #a855f7; }
+        .upsell-type-badge.step1 { background: rgba(59,130,246,0.15); color: #3b82f6; }
+        .upsell-type-badge.step2 { background: rgba(20,184,166,0.15); color: #14b8a6; }
+        .upsell-type-badge.other { background: rgba(100,116,139,0.15); color: #64748b; }
+
+        .type-breakdown {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .type-card {
+            background: var(--content-bg);
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+        }
+        .type-card-icon { font-size: 24px; margin-bottom: 8px; }
+        .type-card-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 4px; }
+        .type-card-value { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+        .type-card-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+        .conversion-bar {
+            height: 8px;
+            background: var(--content-bg);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 6px;
+        }
+        .conversion-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .daily-table th { text-align: right; }
+        .daily-table th:first-child, .daily-table td:first-child { text-align: left; }
+        .daily-table td { text-align: right; }
+        .daily-table td:first-child { text-align: left; font-weight: 500; }
+    </style>
+</head>
+<body>
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <aside class="sidebar"></aside>
+
+    <main class="main">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+                <h1 class="page-title">🎯 Upsell Report</h1>
+            </div>
+            <div class="topbar-right">
+                <div class="status-badge">
+                    <span class="status-dot"></span>
+                    <span id="lastUpdated">Loading...</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="content">
+            <div class="data-info-banner">
+                <div class="info-left">
+                    <span class="info-icon">🎯</span>
+                    <div class="info-text">
+                        <strong>Data Source:</strong> WooCommerce Order Meta (_noriks_upsell)
+                        <span class="info-sep">•</span>
+                        <strong>Period:</strong> <span id="dataRange">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="filters-section">
+                <div class="filters-left">
+                    <div class="filter-group">
+                        <span class="filter-label">Period</span>
+                        <div class="preset-tabs">
+                            <button class="preset-tab" onclick="setDay('today')" id="btn-today">Today</button>
+                            <button class="preset-tab" onclick="setDay('yesterday')" id="btn-yesterday">Yesterday</button>
+                            <button class="preset-tab" onclick="setPreset(7)" id="btn-7d">7D</button>
+                            <button class="preset-tab" onclick="setPreset(14)" id="btn-14d">14D</button>
+                            <button class="preset-tab" onclick="setPreset(30)" id="btn-30d">30D</button>
+                            <button class="preset-tab" onclick="setMonth('current')" id="btn-month">This Month</button>
+                            <button class="preset-tab" onclick="setMonth('last')" id="btn-lastmonth">Last Month</button>
+                        </div>
+                    </div>
+                    <div class="filter-group">
+                        <span class="filter-label">Range</span>
+                        <div class="date-range">
+                            <input type="date" id="startDate" class="date-input">
+                            <span class="date-sep">→</span>
+                            <input type="date" id="endDate" class="date-input">
+                        </div>
+                    </div>
+                </div>
+                <button id="loadBtn" class="btn btn-primary" onclick="loadData()">Apply</button>
+                <button class="btn" style="background:#333;color:#fff;margin-left:8px;" onclick="forceSync()">🔄 Refresh Today</button>
+            </div>
+
+            <div id="error" class="error" style="display:none;"><span>⚠️</span><span id="errorText"></span></div>
+            <div id="loading" style="display:none;"></div>
+
+            <!-- Total metrics -->
+            <div class="metrics-grid" id="metricsGrid" style="display:none;">
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">📦</div></div>
+                    <div class="metric-label">Total Orders</div>
+                    <div class="metric-value" id="totalOrders">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">🎯</div></div>
+                    <div class="metric-label">Upsell Orders</div>
+                    <div class="metric-value text-purple" id="upsellOrders">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">📈</div></div>
+                    <div class="metric-label">Conversion Rate</div>
+                    <div class="metric-value text-green" id="conversionRate">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">💰</div></div>
+                    <div class="metric-label">Upsell Revenue</div>
+                    <div class="metric-value text-primary" id="upsellRevenue">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">💶</div></div>
+                    <div class="metric-label">Avg per Upsell Order</div>
+                    <div class="metric-value text-amber" id="avgUpsell">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">💵</div></div>
+                    <div class="metric-label">Upsell Profit</div>
+                    <div class="metric-value text-green" id="upsellProfit">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">📦</div></div>
+                    <div class="metric-label">Profit per Upsell Order</div>
+                    <div class="metric-value text-green" id="profitPerOrder">—</div>
+                </div>
+            </div>
+
+            <!-- Type breakdown -->
+            <div class="table-card" id="typeBreakdownCard" style="display:none;">
+                <div class="table-header">
+                    <div class="table-title"><span style="font-size:16px;">📊</span> Upsell Type Breakdown</div>
+                </div>
+                <div style="padding: 20px;">
+                    <div class="type-breakdown" id="typeBreakdown"></div>
+                </div>
+            </div>
+
+            <!-- Country cards -->
+            <div class="country-summary" id="countryCards" style="display:none;"></div>
+
+            <!-- Daily table -->
+            <div class="table-card" id="dailyTableCard" style="display:none;">
+                <div class="table-header">
+                    <div class="table-title"><span style="font-size:16px;">📅</span> Daily Breakdown</div>
+                </div>
+                <div class="table-scroll">
+                    <table class="daily-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Orders</th>
+                                <th>Upsells</th>
+                                <th>Conv. %</th>
+                                <th>Revenue €</th>
+                                <th>Sidecart</th>
+                                <th>Step 1</th>
+                                <th>Step 2</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dailyBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/dashboard/sidebar.js"></script>
+    <script>
+        renderSidebar('upsell-report');
+
+        const FLAGS = { HR: '🇭🇷', CZ: '🇨🇿', PL: '🇵🇱', GR: '🇬🇷', IT: '🇮🇹', HU: '🇭🇺', SK: '🇸🇰' };
+        const VAT_RATES = { HR: 0.25, CZ: 0.21, PL: 0.23, GR: 0.24, IT: 0.22, HU: 0.27, SK: 0.20 };
+        const PRODUCT_COSTS = { tshirt: 3.50, boxers: 2.25, socks: 0.80 };
+
+        function getCostForType(type) {
+            if (type.includes('bokserica') || type.includes('boxers')) return PRODUCT_COSTS.boxers;
+            if (type.includes('majica') || type.includes('tshirt')) return PRODUCT_COSTS.tshirt;
+            // sidecart_upsell = nogavice (socks)
+            return PRODUCT_COSTS.socks;
+        }
+
+        function calcProfitByType(byType, countryCode) {
+            const vatRate = VAT_RATES[countryCode] || 0.25;
+            let profit = 0;
+            for (const [type, v] of Object.entries(byType || {})) {
+                const revenueExVat = v.revenue / (1 + vatRate);
+                const itemQty = v.qty || v.count || 0;
+                const nabava = itemQty * getCostForType(type);
+                profit += revenueExVat - nabava;
+            }
+            return profit;
+        }
+
+        function calcProfitMultiCountry(byCountry) {
+            let totalProfit = 0, totalItems = 0, totalUpsellOrders = 0;
+            for (const [cc, c] of Object.entries(byCountry)) {
+                totalProfit += calcProfitByType(c.byType, cc);
+                for (const v of Object.values(c.byType || {})) totalItems += v.count || 0;
+                totalUpsellOrders += c.upsellOrders;
+            }
+            return { totalProfit, totalItems, totalUpsellOrders };
+        }
+        const TYPE_LABELS = {
+            'sidecart_upsell': { label: 'Sidecart Upsell', icon: '🛒', cls: 'sidecart' },
+            'post_purchase_step1_bokserica': { label: 'Step 1 Bokserice', icon: '🩲', cls: 'step1' },
+            'post_purchase_step1_majica': { label: 'Step 1 Majice', icon: '👕', cls: 'step2' },
+            'post_purchase_step1': { label: 'Step 1 (legacy)', icon: '1️⃣', cls: 'step1' },
+            'thank you upsell': { label: 'Thank You (legacy)', icon: '🎁', cls: 'step1' }
+        };
+
+        function getTypeInfo(type) {
+            return TYPE_LABELS[type] || { label: type, icon: '❓', cls: 'other' };
+        }
+
+        function fmt(n) { return '€' + n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+        function fmtPct(n) { return n.toFixed(2) + '%'; }
+
+        // Date helpers
+        function toISO(d) { return d.toISOString().split('T')[0]; }
+        function highlightBtn(id) {
+            document.querySelectorAll('.preset-tab').forEach(t => t.classList.remove('active'));
+            if (id) document.getElementById(id)?.classList.add('active');
+        }
+        function setDay(which) {
+            const now = new Date();
+            if (which === 'today') {
+                document.getElementById('startDate').value = toISO(now);
+                document.getElementById('endDate').value = toISO(now);
+                highlightBtn('btn-today');
+            } else {
+                const y = new Date(now); y.setDate(y.getDate() - 1);
+                document.getElementById('startDate').value = toISO(y);
+                document.getElementById('endDate').value = toISO(y);
+                highlightBtn('btn-yesterday');
+            }
+            loadData();
+        }
+        function setPreset(days) {
+            const end = new Date();
+            const start = new Date(); start.setDate(start.getDate() - days);
+            document.getElementById('startDate').value = toISO(start);
+            document.getElementById('endDate').value = toISO(end);
+            highlightBtn('btn-' + days + 'd');
+            loadData();
+        }
+        function setMonth(which) {
+            const now = new Date();
+            if (which === 'current') {
+                const start = new Date(now.getFullYear(), now.getMonth(), 1);
+                document.getElementById('startDate').value = toISO(start);
+                document.getElementById('endDate').value = toISO(now);
+                highlightBtn('btn-month');
+            } else {
+                const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                const end = new Date(now.getFullYear(), now.getMonth(), 0);
+                document.getElementById('startDate').value = toISO(start);
+                document.getElementById('endDate').value = toISO(end);
+                highlightBtn('btn-lastmonth');
+            }
+            loadData();
+        }
+
+        // Initial: today
+        (function() {
+            const now = new Date();
+            document.getElementById('startDate').value = toISO(now);
+            document.getElementById('endDate').value = toISO(now);
+            document.getElementById('btn-today').classList.add('active');
+        })();
+
+        async function loadData() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            if (!start || !end) return;
+
+            document.getElementById('loading').style.display = 'flex';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('metricsGrid').style.display = 'none';
+            document.getElementById('typeBreakdownCard').style.display = 'none';
+            document.getElementById('countryCards').style.display = 'none';
+            document.getElementById('dailyTableCard').style.display = 'none';
+
+            try {
+                const resp = await fetch(`/dashboard/api/upsell-report?start=${start}&end=${end}`);
+                if (!resp.ok) throw new Error('API error: ' + resp.status);
+                const data = await resp.json();
+                if (data.error) throw new Error(data.error);
+                renderData(data);
+            } catch (e) {
+                document.getElementById('error').style.display = 'flex';
+                document.getElementById('errorText').textContent = e.message;
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function renderData(data) {
+            const t = data.totals;
+            document.getElementById('dataRange').textContent = `${data.start} → ${data.end}`;
+            document.getElementById('lastUpdated').textContent = 'Just now';
+
+            // Metrics
+            document.getElementById('totalOrders').textContent = t.totalOrders.toLocaleString();
+            document.getElementById('upsellOrders').textContent = t.upsellOrders.toLocaleString();
+            document.getElementById('conversionRate').textContent = fmtPct(t.conversionRate);
+            document.getElementById('upsellRevenue').textContent = fmt(t.upsellRevenue);
+            document.getElementById('avgUpsell').textContent = t.upsellOrders > 0 ? fmt(t.upsellRevenue / t.upsellOrders) : '—';
+
+            // Profit calculation
+            const profitData = calcProfitMultiCountry(data.byCountry);
+            document.getElementById('upsellProfit').textContent = fmt(profitData.totalProfit);
+            document.getElementById('profitPerOrder').textContent = profitData.totalUpsellOrders > 0 ? fmt(profitData.totalProfit / profitData.totalUpsellOrders) : '—';
+
+            document.getElementById('metricsGrid').style.display = 'grid';
+
+            // Type breakdown — ALWAYS show all 3 types with conversion %
+            const typeDiv = document.getElementById('typeBreakdown');
+            typeDiv.innerHTML = '';
+            const globalTypeOrder = ['sidecart_upsell', 'post_purchase_step1_bokserica', 'post_purchase_step1_majica'];
+            for (const type of globalTypeOrder) {
+                const vals = { count: 0, revenue: 0 };
+                const raw = (t.byType || {})[type];
+                if (raw) { vals.count += raw.count; vals.revenue += raw.revenue; }
+                const info = getTypeInfo(type);
+                const typePct = t.totalOrders > 0 ? (vals.count / t.totalOrders * 100) : 0;
+                const pctColor = typePct >= 5 ? 'var(--success)' : typePct >= 2 ? 'var(--warning)' : 'var(--text-muted)';
+                // Profit per type across countries
+                let typeProfit = 0;
+                for (const [cc, cData] of Object.entries(data.byCountry)) {
+                    const tv = (cData.byType || {})[type];
+                    if (tv) {
+                        const vatRate = VAT_RATES[cc] || 0.25;
+                        const itemQty = tv.qty || tv.count || 0;
+                        typeProfit += (tv.revenue / (1 + vatRate)) - (itemQty * getCostForType(type));
+                    }
+                }
+                typeDiv.innerHTML += `
+                    <div class="type-card">
+                        <div class="type-card-icon">${info.icon}</div>
+                        <div class="type-card-label">${info.label}</div>
+                        <div class="type-card-value">${vals.count} <span style="font-size:14px;color:${pctColor};">(${fmtPct(typePct)})</span></div>
+                        <div class="type-card-sub">${fmt(vals.revenue)} revenue</div>
+                        <div class="type-card-sub" style="color:${typeProfit >= 0 ? 'var(--success)' : 'var(--danger)'}">💵 ${fmt(typeProfit)} profit</div>
+                    </div>`;
+            }
+            document.getElementById('typeBreakdownCard').style.display = 'block';
+
+            // Country cards
+            const countryDiv = document.getElementById('countryCards');
+            countryDiv.innerHTML = '';
+            const countries = Object.entries(data.byCountry).sort((a, b) => b[1].upsellRevenue - a[1].upsellRevenue);
+            for (const [cc, c] of countries) {
+                const flag = FLAGS[cc] || '🏳️';
+                const barWidth = t.conversionRate > 0 ? Math.min((c.conversionRate / Math.max(...countries.map(x => x[1].conversionRate))) * 100, 100) : 0;
+                const barColor = c.conversionRate >= 10 ? 'var(--success)' : c.conversionRate >= 5 ? 'var(--warning)' : 'var(--danger)';
+
+                // Country profit
+                const countryProfit = calcProfitByType(c.byType, cc);
+                const profitPerUpsellOrder = c.upsellOrders > 0 ? countryProfit / c.upsellOrders : 0;
+
+                // Per-type stats for this country — ALWAYS show all 3 types
+                const typeOrder = ['sidecart_upsell', 'post_purchase_step1_bokserica', 'post_purchase_step1_majica'];
+                let typeStatsHTML = '';
+                for (const type of typeOrder) {
+                    const vals = (c.byType || {})[type] || { count: 0, revenue: 0 };
+                    const info = getTypeInfo(type);
+                    const typePct = c.totalOrders > 0 ? (vals.count / c.totalOrders * 100) : 0;
+                    const pctColor = typePct >= 5 ? 'var(--success)' : typePct >= 2 ? 'var(--warning)' : 'var(--text-muted)';
+                    typeStatsHTML += `
+                        <div class="country-stat">
+                            <div class="country-stat-value">${vals.count} <span style="font-size:11px;color:${pctColor};">(${fmtPct(typePct)})</span></div>
+                            <div class="country-stat-label">${info.icon} ${info.label.replace('Post-Purchase ', '')}</div>
+                        </div>`;
+                }
+
+                countryDiv.innerHTML += `
+                    <div class="country-card ${cc.toLowerCase()}">
+                        <div class="country-header">
+                            <div class="country-info">
+                                <span class="country-flag">${flag}</span>
+                                <span class="country-name">${cc}</span>
+                            </div>
+                            <span class="country-roas" style="color:${barColor}">${fmtPct(c.conversionRate)}</span>
+                        </div>
+                        <div class="country-stats" style="grid-template-columns: repeat(3, 1fr);">
+                            <div class="country-stat">
+                                <div class="country-stat-value">${c.totalOrders.toLocaleString()}</div>
+                                <div class="country-stat-label">Orders</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value">${c.upsellOrders.toLocaleString()}</div>
+                                <div class="country-stat-label">Upsells</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value">${fmt(c.upsellRevenue)}</div>
+                                <div class="country-stat-label">Revenue</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value">${c.upsellOrders > 0 ? fmt(c.upsellRevenue / c.upsellOrders) : '—'}</div>
+                                <div class="country-stat-label">Avg/Upsell</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" style="color:${countryProfit >= 0 ? 'var(--success)' : 'var(--danger)'}">${fmt(countryProfit)}</div>
+                                <div class="country-stat-label">💵 Profit</div>
+                            </div>
+                            <div class="country-stat">
+                                <div class="country-stat-value" style="color:${profitPerUpsellOrder >= 0 ? 'var(--success)' : 'var(--danger)'}">${c.upsellOrders > 0 ? fmt(profitPerUpsellOrder) : '—'}</div>
+                                <div class="country-stat-label">💵 Profit/Order</div>
+                            </div>
+                        </div>
+                        <div class="country-stats" style="grid-template-columns: repeat(3, 1fr); margin-top: 8px;">${typeStatsHTML}</div>
+                        <div class="conversion-bar">
+                            <div class="conversion-bar-fill" style="width:${barWidth}%; background:${barColor};"></div>
+                        </div>
+                    </div>`;
+            }
+            document.getElementById('countryCards').style.display = 'grid';
+
+            // Daily table — aggregate all countries
+            const allDates = new Set();
+            for (const c of Object.values(data.byCountry)) {
+                for (const date of Object.keys(c.daily || {})) allDates.add(date);
+            }
+            const sortedDates = [...allDates].sort().reverse();
+
+            const tbody = document.getElementById('dailyBody');
+            tbody.innerHTML = '';
+            for (const date of sortedDates) {
+                let orders = 0, upsells = 0, revenue = 0, sidecart = 0, step1 = 0, step2 = 0;
+                for (const c of Object.values(data.byCountry)) {
+                    const d = (c.daily || {})[date];
+                    if (!d) continue;
+                    orders += d.orders;
+                    upsells += d.upsellOrders;
+                    revenue += d.upsellRevenue;
+                    sidecart += (d.byType?.sidecart_upsell?.count || 0);
+                    step1 += (d.byType?.post_purchase_step1?.count || 0) + (d.byType?.['thank you upsell']?.count || 0);
+                    step2 += (d.byType?.post_purchase_step2?.count || 0);
+                }
+                const conv = orders > 0 ? (upsells / orders * 100) : 0;
+                const convClass = conv >= 10 ? 'text-green' : conv >= 5 ? 'text-amber' : conv > 0 ? 'text-red' : '';
+                tbody.innerHTML += `<tr>
+                    <td>${date}</td>
+                    <td>${orders}</td>
+                    <td>${upsells}</td>
+                    <td class="${convClass}">${fmtPct(conv)}</td>
+                    <td>${fmt(revenue)}</td>
+                    <td>${sidecart || '—'}</td>
+                    <td>${step1 || '—'}</td>
+                    <td>${step2 || '—'}</td>
+                </tr>`;
+            }
+            document.getElementById('dailyTableCard').style.display = 'block';
+        }
+
+        // Force sync today's data
+        async function forceSync() {
+            var btn = event.target;
+            btn.textContent = '⏳ Syncing...';
+            btn.disabled = true;
+            try {
+                const resp = await fetch('/dashboard/api/force-sync-today', {credentials:'same-origin'});
+                const data = await resp.json();
+                if (data.ok) {
+                    btn.textContent = '✅ Done!';
+                    setDay('today');
+                    setTimeout(function(){ btn.textContent = '🔄 Refresh Today'; btn.disabled = false; }, 2000);
+                } else {
+                    btn.textContent = '❌ Failed';
+                    setTimeout(function(){ btn.textContent = '🔄 Refresh Today'; btn.disabled = false; }, 3000);
+                }
+            } catch(e) {
+                btn.textContent = '❌ Error';
+                setTimeout(function(){ btn.textContent = '🔄 Refresh Today'; btn.disabled = false; }, 3000);
+            }
+        }
+
+        // Auto-load on page open
+        loadData();
+    </script>
+</body>
+</html>

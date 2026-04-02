@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rejection Report - Noriks Analytics</title>
+    <link rel="stylesheet" href="/dashboard/styles.css?v=20260224bb">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .summary-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 18px;
+            border: 1px solid var(--border);
+        }
+        .summary-card-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .summary-card-value {
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .summary-card-value.success { color: #27ae60; }
+        .summary-card-value.warning { color: #f39c12; }
+        .summary-card-value.danger { color: #e74c3c; }
+        .summary-card-value.info { color: #3498db; }
+        
+        .country-totals {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .country-card {
+            background: linear-gradient(135deg, var(--card-bg), var(--hover));
+            border-radius: 12px;
+            padding: 20px;
+            border: 2px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 8px;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .country-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .country-card.hr { border-top: 4px solid #e74c3c; }
+        .country-card.cz { border-top: 4px solid #3498db; }
+        .country-card.gr { border-top: 4px solid #1abc9c; }
+        .country-card.it { border-top: 4px solid #27ae60; }
+        .country-card.pl { border-top: 4px solid #e74c3c; }
+        .country-card.sk { border-top: 4px solid #3498db; }
+        .country-flag-big {
+            font-size: 36px;
+            line-height: 1;
+        }
+        .country-info h4 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .country-rate {
+            font-size: 28px;
+            font-weight: 800;
+            line-height: 1;
+            margin: 4px 0;
+        }
+        .country-stats {
+            font-size: 11px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+        .country-stats span {
+            display: block;
+        }
+        
+        .report-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 16px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .report-table th,
+        .report-table td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+            border-right: 1px solid var(--border);
+        }
+        .report-table th:last-child,
+        .report-table td:last-child {
+            border-right: none;
+        }
+        .report-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        .report-table th {
+            background: linear-gradient(135deg, var(--card-bg), var(--hover));
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid var(--border);
+        }
+        .report-table tbody tr {
+            transition: background 0.15s ease;
+        }
+        .report-table tbody tr:hover {
+            background: var(--hover);
+        }
+        .report-table tbody tr:nth-child(even) {
+            background: rgba(127, 127, 127, 0.03);
+        }
+        .report-table tbody tr:nth-child(even):hover {
+            background: var(--hover);
+        }
+        .report-table td.number {
+            text-align: right;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 13px;
+        }
+        .report-table td:first-child {
+            font-weight: 600;
+        }
+        .rejection-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .rejection-badge.low { background: rgba(39, 174, 96, 0.2); color: #27ae60; }
+        .rejection-badge.medium { background: rgba(243, 156, 18, 0.2); color: #f39c12; }
+        .rejection-badge.high { background: rgba(231, 76, 60, 0.2); color: #e74c3c; }
+        
+        .chart-container {
+            position: relative;
+            height: 280px;
+            margin: 16px 0;
+        }
+        
+        .country-flag {
+            font-size: 18px;
+            margin-right: 8px;
+        }
+        
+        .filter-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .filter-bar label {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .filter-bar select {
+            padding: 8px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--card-bg);
+            color: var(--text-primary);
+            font-size: 13px;
+            cursor: pointer;
+        }
+        
+        .expand-btn {
+            cursor: pointer;
+            user-select: none;
+            display: inline-block;
+            width: 20px;
+            text-align: center;
+            font-size: 11px;
+            transition: transform 0.2s;
+        }
+        .expand-btn.open {
+            transform: rotate(90deg);
+        }
+        .daily-row td {
+            background: rgba(127,127,127,0.06) !important;
+            font-size: 12px;
+            padding: 8px 16px;
+            color: var(--text-secondary);
+        }
+        .daily-row td:first-child {
+            padding-left: 40px;
+            font-weight: 400;
+        }
+        .data-source {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+        
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 20px;
+        }
+        
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <aside class="sidebar"></aside>
+    
+    <main class="main">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+                <h1 class="page-title">📋 Rejection Report</h1>
+            </div>
+            <div class="topbar-right">
+                <button class="theme-toggle" onclick="toggleTheme()">
+                    <span id="themeIcon">🌙</span>
+                    <span id="themeText">Dark</span>
+                </button>
+            </div>
+        </header>
+        
+        <div class="content">
+            <!-- Overall Summary -->
+            <div class="section-title">📦 Overall Totals (Shipped Orders Only)</div>
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <div class="summary-card-label">Total Shipped</div>
+                    <div class="summary-card-value" id="totalShipped">-</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-card-label">Completed</div>
+                    <div class="summary-card-value success" id="completedOrders">-</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-card-label">Rejected</div>
+                    <div class="summary-card-value danger" id="rejectedOrders">-</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-card-label">In Transit</div>
+                    <div class="summary-card-value info" id="inTransit">-</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-card-label">Rejection Rate</div>
+                    <div class="summary-card-value warning" id="rejectionRate">-</div>
+                </div>
+            </div>
+            
+            <!-- Country Totals -->
+            <div class="section-title">🌍 Totals by Country</div>
+            <div class="country-totals" id="countryTotals"></div>
+            
+            <div class="grid-2">
+                <!-- Monthly Trend Chart -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">📈 Monthly Rejection Trend</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="trendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- By Country Chart -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">📊 Orders by Country</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="countryChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Detailed Table with Filter -->
+            <div class="card" style="margin-top: 20px;">
+                <div class="card-header">
+                    <h3 class="card-title">📋 Detailed Breakdown</h3>
+                </div>
+                <div class="card-body">
+                    <div class="filter-bar">
+                        <label>Filter by Month:</label>
+                        <select id="monthFilter" onchange="filterTable()">
+                            <option value="all">All Months</option>
+                        </select>
+                        <label style="margin-left: 16px;">Country:</label>
+                        <select id="countryFilter" onchange="filterTable()">
+                            <option value="all">All Countries</option>
+                        </select>
+                    </div>
+                    
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th>Country</th>
+                                <th style="text-align: right;">Shipped</th>
+                                <th style="text-align: right;">Completed</th>
+                                <th style="text-align: right;">Rejected</th>
+                                <th style="text-align: right;">In Transit</th>
+                                <th style="text-align: right;">Rejection Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detailTable"></tbody>
+                    </table>
+                    
+                    <div class="data-source">
+                        <strong>Data Source:</strong> Metakocka API (noriks.com/* orders only)<br>
+                        <strong>Last Updated:</strong> <span id="lastUpdated">-</span><br>
+                        <strong>Formula:</strong> Rejection Rate = Rejected / Shipped (where Shipped = Completed + Rejected + In Transit)
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const FLAGS = {
+            'HR': '🇭🇷', 'Croatia': '🇭🇷',
+            'CZ': '🇨🇿', 'Czech Republic': '🇨🇿',
+            'PL': '🇵🇱', 'Poland': '🇵🇱',
+            'SK': '🇸🇰', 'Slovakia': '🇸🇰',
+            'HU': '🇭🇺', 'Hungary': '🇭🇺',
+            'SI': '🇸🇮', 'Slovenia': '🇸🇮',
+            'GR': '🇬🇷', 'Greece': '🇬🇷',
+            'IT': '🇮🇹', 'Italy': '🇮🇹'
+        };
+        
+        function getFlag(country) {
+            return FLAGS[country] || '🏳️';
+        }
+        
+        function getRejectionBadgeClass(rate) {
+            if (rate <= 5) return 'low';
+            if (rate <= 10) return 'medium';
+            return 'high';
+        }
+        
+        function getRateColor(rate) {
+            if (rate <= 5) return '#27ae60';
+            if (rate <= 10) return '#f39c12';
+            return '#e74c3c';
+        }
+        
+        let reportData = null;
+        let trendChart, countryChart;
+        
+        async function loadData() {
+            try {
+                const response = await fetch('/dashboard/rejection-data.json?t=' + Date.now());
+                reportData = await response.json();
+                
+                // Update summary
+                document.getElementById('totalShipped').textContent = reportData.summary.shipped.toLocaleString();
+                document.getElementById('completedOrders').textContent = reportData.summary.completed.toLocaleString();
+                document.getElementById('rejectedOrders').textContent = reportData.summary.rejected.toLocaleString();
+                document.getElementById('inTransit').textContent = reportData.summary.in_transit.toLocaleString();
+                
+                const overallRate = ((reportData.summary.rejected / reportData.summary.shipped) * 100).toFixed(1);
+                document.getElementById('rejectionRate').textContent = overallRate + '%';
+                
+                document.getElementById('lastUpdated').textContent = new Date(reportData.generated_at).toLocaleString();
+                
+                // Country totals cards
+                const countryTotals = document.getElementById('countryTotals');
+                countryTotals.innerHTML = reportData.totals_by_country.map(c => `
+                    <div class="country-card ${(c.country_iso || '').toLowerCase()}">
+                        <div class="country-flag-big">${getFlag(c.country)}</div>
+                        <div class="country-info"><h4>${c.country}</h4></div>
+                        <div class="country-rate" style="color: ${getRateColor(c.rejection_rate)}">
+                            ${c.rejection_rate.toFixed(1)}%
+                        </div>
+                        <div class="country-stats">
+                            <span>📦 ${c.shipped} shipped</span>
+                            <span>❌ ${c.rejected} rejected</span>
+                        </div>
+                    </div>
+                `).join('');
+                
+                // Populate filters
+                const monthFilter = document.getElementById('monthFilter');
+                reportData.months_available.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m;
+                    opt.textContent = m;
+                    monthFilter.appendChild(opt);
+                });
+                
+                // Default to previous month
+                const now = new Date();
+                const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                const prevMonthStr = prevMonth.toISOString().slice(0, 7);
+                if (reportData.months_available.includes(prevMonthStr)) {
+                    monthFilter.value = prevMonthStr;
+                } else if (reportData.months_available.length > 0) {
+                    // Fallback to latest available month
+                    monthFilter.value = reportData.months_available[reportData.months_available.length - 1];
+                }
+                
+                const countryFilter = document.getElementById('countryFilter');
+                reportData.totals_by_country.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.country;
+                    opt.textContent = getFlag(c.country) + ' ' + c.country;
+                    countryFilter.appendChild(opt);
+                });
+                
+                // Build table
+                filterTable();
+                
+                // Trend chart
+                const trendCtx = document.getElementById('trendChart').getContext('2d');
+                if (trendChart) trendChart.destroy();
+                trendChart = new Chart(trendCtx, {
+                    type: 'line',
+                    data: {
+                        labels: reportData.by_month.map(m => m.month),
+                        datasets: [
+                            {
+                                label: 'Rejection Rate %',
+                                data: reportData.by_month.map(m => m.rejection_rate),
+                                borderColor: '#e74c3c',
+                                backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                                fill: true,
+                                tension: 0.3,
+                                yAxisID: 'y'
+                            },
+                            {
+                                label: 'Shipped',
+                                data: reportData.by_month.map(m => m.shipped),
+                                borderColor: '#3498db',
+                                backgroundColor: 'transparent',
+                                borderDash: [5, 5],
+                                tension: 0.3,
+                                yAxisID: 'y1'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false
+                        },
+                        scales: {
+                            y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                beginAtZero: true,
+                                max: 20,
+                                ticks: { callback: v => v + '%' }
+                            },
+                            y1: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                beginAtZero: true,
+                                grid: { drawOnChartArea: false }
+                            }
+                        }
+                    }
+                });
+                
+                // Country chart
+                const countryCtx = document.getElementById('countryChart').getContext('2d');
+                if (countryChart) countryChart.destroy();
+                countryChart = new Chart(countryCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: reportData.totals_by_country.map(c => getFlag(c.country) + ' ' + c.country),
+                        datasets: [
+                            {
+                                label: 'Completed',
+                                data: reportData.totals_by_country.map(c => c.completed),
+                                backgroundColor: '#27ae60'
+                            },
+                            {
+                                label: 'Rejected',
+                                data: reportData.totals_by_country.map(c => c.rejected),
+                                backgroundColor: '#e74c3c'
+                            },
+                            {
+                                label: 'In Transit',
+                                data: reportData.totals_by_country.map(c => c.in_transit),
+                                backgroundColor: '#3498db'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'top' }
+                        },
+                        scales: {
+                            x: { stacked: true },
+                            y: { stacked: true }
+                        }
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Failed to load rejection data:', error);
+            }
+        }
+        
+        function filterTable() {
+            const monthVal = document.getElementById('monthFilter').value;
+            const countryVal = document.getElementById('countryFilter').value;
+            
+            let filtered = reportData.by_month_country;
+            
+            if (monthVal !== 'all') {
+                filtered = filtered.filter(r => r.month === monthVal);
+            }
+            if (countryVal !== 'all') {
+                filtered = filtered.filter(r => r.country === countryVal);
+            }
+            
+            const tbody = document.getElementById('detailTable');
+            let rows = filtered.map((row, i) => `
+                <tr class="expandable-row" data-idx="${i}" data-month="${row.month}" data-country-iso="${row.country_iso}" onclick="toggleDaily(this)" style="cursor:pointer;">
+                    <td><span class="expand-btn" id="ebtn-${i}">▶</span> <strong>${row.month}</strong></td>
+                    <td><span class="country-flag">${getFlag(row.country)}</span>${row.country}</td>
+                    <td class="number">${row.shipped}</td>
+                    <td class="number">${row.completed}</td>
+                    <td class="number">${row.rejected}</td>
+                    <td class="number">${row.in_transit}</td>
+                    <td class="number">
+                        <span class="rejection-badge ${getRejectionBadgeClass(row.rejection_rate)}">
+                            ${row.rejection_rate}%
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+
+            // Add TOTAL row
+            if (filtered.length > 0) {
+                const totals = filtered.reduce((acc, row) => {
+                    acc.shipped += row.shipped || 0;
+                    acc.completed += row.completed || 0;
+                    acc.rejected += row.rejected || 0;
+                    acc.in_transit += row.in_transit || 0;
+                    return acc;
+                }, { shipped: 0, completed: 0, rejected: 0, in_transit: 0 });
+                const totalRate = totals.shipped > 0 ? (totals.rejected / totals.shipped * 100).toFixed(1) : '0.0';
+                rows += `
+                <tr style="font-weight:700; border-top:2px solid var(--border-color, #555);">
+                    <td><strong>TOTAL</strong></td>
+                    <td></td>
+                    <td class="number">${totals.shipped.toLocaleString()}</td>
+                    <td class="number">${totals.completed.toLocaleString()}</td>
+                    <td class="number">${totals.rejected.toLocaleString()}</td>
+                    <td class="number">${totals.in_transit.toLocaleString()}</td>
+                    <td class="number">
+                        <span class="rejection-badge ${getRejectionBadgeClass(parseFloat(totalRate))}">
+                            ${totalRate}%
+                        </span>
+                    </td>
+                </tr>`;
+            }
+
+            tbody.innerHTML = rows;
+            
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-secondary);">No data for selected filters</td></tr>';
+            }
+        }
+        
+        // Theme
+        function toggleTheme() {
+            const body = document.body;
+            const isDark = body.getAttribute('data-theme') === 'dark';
+            body.setAttribute('data-theme', isDark ? 'light' : 'dark');
+            localStorage.setItem('theme', isDark ? 'light' : 'dark');
+            document.getElementById('themeIcon').textContent = isDark ? '🌙' : '☀️';
+            document.getElementById('themeText').textContent = isDark ? 'Dark' : 'Light';
+        }
+        
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        document.body.setAttribute('data-theme', savedTheme);
+        document.getElementById('themeIcon').textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+        document.getElementById('themeText').textContent = savedTheme === 'dark' ? 'Light' : 'Dark';
+
+        function toggleSidebar() {
+
+        function toggleCollapse() {
+            const sidebar = document.querySelector(".sidebar");
+            const btn = document.querySelector(".collapse-btn");
+            sidebar.classList.toggle("collapsed");
+            const isCollapsed = sidebar.classList.contains("collapsed");
+            btn.querySelector(".collapse-text").textContent = isCollapsed ? "Show" : "Hide Menu";
+            btn.querySelector(".collapse-icon").textContent = isCollapsed ? "▶" : "◀";
+            localStorage.setItem("sidebarCollapsed", isCollapsed);
+        }
+
+        // Load saved collapse state
+        if (localStorage.getItem("sidebarCollapsed") === "true") {
+            document.querySelector(".sidebar").classList.add("collapsed");
+            const collapseText = document.querySelector(".collapse-text");
+            const collapseIcon = document.querySelector(".collapse-icon");
+            if (collapseText) collapseText.textContent = "Show";
+            if (collapseIcon) collapseIcon.textContent = "▶";
+        }
+            document.querySelector('.sidebar').classList.toggle('open');
+            document.querySelector('.sidebar-overlay').classList.toggle('open');
+        }
+
+        function logout() {
+            document.cookie = 'session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+            window.location.href = '/dashboard/login';
+        }
+        
+        function toggleDaily(tr) {
+            const idx = tr.dataset.idx;
+            const month = tr.dataset.month;
+            const ciso = tr.dataset.countryIso;
+            const btn = document.getElementById('ebtn-' + idx);
+            
+            // Check if already expanded
+            const existing = tr.parentNode.querySelectorAll(`.daily-row[data-parent="${idx}"]`);
+            if (existing.length > 0) {
+                existing.forEach(r => r.remove());
+                btn.classList.remove('open');
+                return;
+            }
+            
+            btn.classList.add('open');
+            
+            // Filter daily data for this month + country
+            const dailyRows = (reportData.by_date_country || [])
+                .filter(d => d.date.startsWith(month) && d.country_iso === ciso)
+                .sort((a, b) => a.date.localeCompare(b.date));
+            
+            if (dailyRows.length === 0) {
+                const noRow = document.createElement('tr');
+                noRow.className = 'daily-row';
+                noRow.dataset.parent = idx;
+                noRow.innerHTML = '<td colspan="7" style="text-align:center;font-style:italic;">No daily data</td>';
+                tr.after(noRow);
+                return;
+            }
+            
+            // Build full date range for the month (including weekends as empty)
+            const year = parseInt(month.split('-')[0]);
+            const mon = parseInt(month.split('-')[1]) - 1;
+            const daysInMonth = new Date(year, mon + 1, 0).getDate();
+            const today = new Date().toISOString().slice(0, 10);
+            const dailyMap = {};
+            for (const d of dailyRows) dailyMap[d.date] = d;
+            const allDays = [];
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = `${month}-${String(day).padStart(2, '0')}`;
+                if (dateStr > today) break; // don't show future dates
+                if (dailyMap[dateStr]) {
+                    allDays.push(dailyMap[dateStr]);
+                } else {
+                    allDays.push({ date: dateStr, shipped: 0, completed: 0, rejected: 0, in_transit: 0, rejection_rate: 0 });
+                }
+            }
+            
+            // Insert daily rows after the parent row
+            let afterEl = tr;
+            for (const d of allDays) {
+                const row = document.createElement('tr');
+                row.className = 'daily-row';
+                row.dataset.parent = idx;
+                row.innerHTML = `
+                    <td>${(() => { const days = ['NED','PON','TOR','SRE','ČET','PET','SOB']; const dt = new Date(d.date + 'T00:00:00'); return days[dt.getDay()] + ' ' + d.date; })()}</td>
+                    <td></td>
+                    <td class="number">${d.shipped}</td>
+                    <td class="number">${d.completed}</td>
+                    <td class="number">${d.rejected}</td>
+                    <td class="number">${d.in_transit}</td>
+                    <td class="number">
+                        <span class="rejection-badge ${getRejectionBadgeClass(d.rejection_rate)}">
+                            ${d.rejection_rate}%
+                        </span>
+                    </td>
+                `;
+                afterEl.after(row);
+                afterEl = row;
+            }
+        }
+        
+        // Load data on page load
+        loadData();
+    </script>
+<script src="/dashboard/sidebar.js"></script>
+    <script>renderSidebar('rejection-report');</script>
+</body>
+</html>

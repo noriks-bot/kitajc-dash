@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Origin Report - Noriks Analytics</title>
+    <link rel="stylesheet" href="/dashboard/styles.css?v=20260309b">
+    <style>
+        .origin-table { width: 100%; border-collapse: collapse; }
+        .origin-table th, .origin-table td { padding: 10px 12px; text-align: center; border-bottom: 1px solid var(--border-color); font-size: 13px; }
+        .origin-table th { color: var(--text-secondary); text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; font-weight: 600; background: var(--content-bg); position: sticky; top: 0; }
+        .origin-table td:first-child, .origin-table th:first-child { text-align: left; font-weight: 600; }
+        .origin-table tr:hover { background: rgba(59,130,246,0.04); }
+        .origin-table .total-row { font-weight: 700; background: var(--content-bg); border-top: 2px solid var(--border-color); }
+        .pct { font-size: 10px; color: var(--text-muted); margin-left: 2px; }
+        .bar-container { display: flex; height: 32px; border-radius: 6px; overflow: hidden; margin-bottom: 12px; }
+        .bar-segment { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: white; min-width: 30px; transition: width 0.3s; }
+        .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; color: var(--text-secondary); margin-bottom: 0; }
+        .source-dist-content { padding: 0 20px 20px; }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+        .source-colors { --fb: #3b82f6; --gorg: #22c55e; --gpaid: #14b8a6; --klaviyo: #a855f7; --direct: #f59e0b; --callcenter: #ef4444; }
+    </style>
+</head>
+<body class="source-colors">
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <aside class="sidebar"></aside>
+
+    <main class="main">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+                <h1 class="page-title">📍 Origin Report</h1>
+            </div>
+            <div class="topbar-right">
+                <div class="status-badge">
+                    <span class="status-dot"></span>
+                    <span id="lastUpdated">Loading...</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="content">
+            <div class="data-info-banner">
+                <div class="info-left">
+                    <span class="info-icon">📡</span>
+                    <div class="info-text">
+                        <strong>Data Source:</strong> WooCommerce Order Attribution
+                        <span class="info-sep">•</span>
+                        <strong>Period:</strong> <span id="dataRange">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="filters-section">
+                <div class="filters-left">
+                    <div class="filter-group">
+                        <span class="filter-label">Period</span>
+                        <div class="preset-tabs">
+                            <button class="preset-tab" onclick="setDay('today')" id="btn-today">Today</button>
+                            <button class="preset-tab" onclick="setDay('yesterday')" id="btn-yesterday">Yesterday</button>
+                            <button class="preset-tab" onclick="setPreset(7)" id="btn-7d">7D</button>
+                            <button class="preset-tab" onclick="setPreset(14)" id="btn-14d">14D</button>
+                            <button class="preset-tab" onclick="setPreset(30)" id="btn-30d">30D</button>
+                            <button class="preset-tab" onclick="setMonth('current')" id="btn-month">This Month</button>
+                            <button class="preset-tab" onclick="setMonth('last')" id="btn-lastmonth">Last Month</button>
+                            <button class="preset-tab" onclick="setYear()" id="btn-year">Year</button>
+                        </div>
+                    </div>
+                    <div class="filter-group">
+                        <span class="filter-label">Range</span>
+                        <div class="date-range">
+                            <input type="date" id="startDate" class="date-input">
+                            <span class="date-sep">→</span>
+                            <input type="date" id="endDate" class="date-input">
+                        </div>
+                    </div>
+                </div>
+                <button id="loadBtn" class="btn btn-primary" onclick="loadData()">Apply</button>
+            </div>
+
+            <div id="error" class="error" style="display:none;"><span>⚠️</span><span id="errorText"></span></div>
+
+            <!-- Totals -->
+            <div class="metrics-grid" id="metricsGrid">
+                <div class="metric-card"><div class="metric-header"><div class="metric-icon">📦</div></div><div class="metric-label">Total Orders</div><div class="metric-value" id="totalOrders">—</div></div>
+                <div class="metric-card"><div class="metric-header"><div class="metric-icon" style="background:var(--fb);">📘</div></div><div class="metric-label">Facebook</div><div class="metric-value text-primary" id="totalFB">—</div></div>
+                <div class="metric-card"><div class="metric-header"><div class="metric-icon" style="background:var(--gorg);">🔍</div></div><div class="metric-label">Google Organic</div><div class="metric-value text-green" id="totalGOrg">—</div></div>
+                <div class="metric-card"><div class="metric-header"><div class="metric-icon" style="background:var(--gpaid);">💰</div></div><div class="metric-label">Google Paid</div><div class="metric-value" id="totalGPaid" style="color:var(--gpaid);">—</div></div>
+                <div class="metric-card"><div class="metric-header"><div class="metric-icon" style="background:var(--klaviyo);">💜</div></div><div class="metric-label">Klaviyo</div><div class="metric-value" id="totalKlaviyo" style="color:var(--klaviyo);">—</div></div>
+                <div class="metric-card"><div class="metric-header"><div class="metric-icon" style="background:var(--direct);">🟡</div></div><div class="metric-label">Direct</div><div class="metric-value text-amber" id="totalDirect">—</div></div>
+                <div class="metric-card"><div class="metric-header"><div class="metric-icon" style="background:var(--callcenter);">📞</div></div><div class="metric-label">Call Center</div><div class="metric-value" id="totalCallCenter" style="color:var(--callcenter);">—</div></div>
+            </div>
+
+            <!-- Overall bar -->
+            <div class="table-card">
+                <div class="table-header"><div class="table-title">📊 Source Distribution</div></div>
+                <div class="source-dist-content">
+                <div id="overallBar"></div>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-dot" style="background:var(--fb);"></div>Facebook</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:var(--gorg);"></div>Google Organic</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:var(--gpaid);"></div>Google Paid</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:var(--klaviyo);"></div>Klaviyo</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:var(--direct);"></div>Direct</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:var(--callcenter);"></div>Call Center</div>
+                </div>
+                </div>
+            </div>
+
+            <!-- By Country -->
+            <div class="table-card">
+                <div class="table-header"><div class="table-title">🏳️ By Country</div></div>
+                <table class="origin-table" id="countryTable">
+                    <thead><tr><th>Country</th><th>Total</th><th>Facebook</th><th>G. Organic</th><th>G. Paid</th><th>Klaviyo</th><th>Direct</th><th>Call Center</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <!-- Daily Table -->
+            <div class="table-card">
+                <div class="table-header"><div class="table-title">📋 Daily Breakdown</div></div>
+                <div style="max-height:500px;overflow-y:auto;">
+                    <table class="origin-table" id="dailyTable">
+                        <thead><tr><th>Date</th><th>Total</th><th>Facebook</th><th>G. Organic</th><th>G. Paid</th><th>Klaviyo</th><th>Direct</th><th>Call Center</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/dashboard/sidebar.js?v=20260309"></script>
+    <script>
+        renderSidebar('origin');
+
+        const FLAGS = { HR: '🇭🇷', CZ: '🇨🇿', PL: '🇵🇱', GR: '🇬🇷', IT: '🇮🇹', HU: '🇭🇺', SK: '🇸🇰' };
+        const NAMES = { HR: 'Croatia', CZ: 'Czech Republic', PL: 'Poland', GR: 'Greece', IT: 'Italy', HU: 'Hungary', SK: 'Slovakia' };
+        const SOURCES = ['Facebook', 'Google Organic', 'Google Paid', 'Klaviyo', 'Direct', 'Call Center'];
+        const COLORS = { Facebook: 'var(--fb)', 'Google Organic': 'var(--gorg)', 'Google Paid': 'var(--gpaid)', Klaviyo: 'var(--klaviyo)', Direct: 'var(--direct)', 'Call Center': 'var(--callcenter)' };
+
+        function formatDate(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+        function pct(n, t) { return t > 0 ? Math.round(n/t*100) : 0; }
+
+        function updateActiveTab(id) {
+            document.querySelectorAll('.preset-tab').forEach(t => t.classList.remove('active'));
+            const tab = document.getElementById('btn-' + id);
+            if (tab) tab.classList.add('active');
+        }
+
+        function setPreset(days) {
+            const y = new Date(); y.setDate(y.getDate() - 1);
+            const s = new Date(y); s.setDate(s.getDate() - (days - 1));
+            document.getElementById('startDate').value = formatDate(s);
+            document.getElementById('endDate').value = formatDate(y);
+            updateActiveTab(days + 'd');
+            loadData();
+        }
+
+        function setDay(which) {
+            const d = which === 'today' ? new Date() : new Date(Date.now() - 86400000);
+            document.getElementById('startDate').value = formatDate(d);
+            document.getElementById('endDate').value = formatDate(d);
+            updateActiveTab(which);
+            loadData();
+        }
+
+        function setYear() {
+            const now = new Date();
+            document.getElementById('startDate').value = now.getFullYear() + '-01-01';
+            document.getElementById('endDate').value = formatDate(now);
+            updateActiveTab('year');
+            loadData();
+        }
+        function setMonth(which) {
+            const now = new Date();
+            let start, end;
+            if (which === 'current') { start = new Date(now.getFullYear(), now.getMonth(), 1); end = now; updateActiveTab('month'); }
+            else { start = new Date(now.getFullYear(), now.getMonth() - 1, 1); end = new Date(now.getFullYear(), now.getMonth(), 0); updateActiveTab('lastmonth'); }
+            document.getElementById('startDate').value = formatDate(start);
+            document.getElementById('endDate').value = formatDate(end);
+            loadData();
+        }
+
+        async function loadData(forceRefresh) {
+            const btn = document.getElementById('loadBtn');
+            const errorDiv = document.getElementById('error');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;margin:0;"></span>';
+            errorDiv.style.display = 'none';
+
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+
+            try {
+                const bp = window.location.pathname.startsWith('/advertiser') ? '/advertiser' : '/dashboard';
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 120000);
+                const res = await fetch(`${bp}/api/origin-data?start=${start}&end=${end}${forceRefresh ? '&refresh=1' : ''}&_=${Date.now()}`, { signal: controller.signal, cache: 'no-store' });
+                clearTimeout(timeout);
+                if (!res.ok) throw new Error('API error');
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                renderData(data);
+                document.getElementById('lastUpdated').textContent = 'Just now';
+                document.getElementById('dataRange').textContent = `${start} → ${end}`;
+            } catch (e) {
+                document.getElementById('errorText').textContent = e.message;
+                errorDiv.style.display = 'flex';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Apply';
+            }
+        }
+
+        function renderData(data) {
+            const t = data.totals;
+
+            // Metric cards
+            document.getElementById('totalOrders').textContent = t.total;
+            document.getElementById('totalFB').innerHTML = `${t.Facebook} <span class="pct">(${pct(t.Facebook, t.total)}%)</span>`;
+            document.getElementById('totalGOrg').innerHTML = `${t['Google Organic']} <span class="pct">(${pct(t['Google Organic'], t.total)}%)</span>`;
+            document.getElementById('totalGPaid').innerHTML = `${t['Google Paid']} <span class="pct">(${pct(t['Google Paid'], t.total)}%)</span>`;
+            document.getElementById('totalKlaviyo').innerHTML = `${t.Klaviyo} <span class="pct">(${pct(t.Klaviyo, t.total)}%)</span>`;
+            document.getElementById('totalDirect').innerHTML = `${t.Direct} <span class="pct">(${pct(t.Direct, t.total)}%)</span>`;
+            document.getElementById('totalCallCenter').innerHTML = `${t['Call Center']||0} <span class="pct">(${pct(t['Call Center']||0, t.total)}%)</span>`;
+
+            // Overall bar
+            let barHtml = '<div class="bar-container">';
+            for (const src of SOURCES) {
+                const p = pct(t[src], t.total);
+                if (p > 0) barHtml += `<div class="bar-segment" style="width:${Math.max(p,2)}%;background:${COLORS[src]};">${p}%</div>`;
+            }
+            barHtml += '</div>';
+            document.getElementById('overallBar').innerHTML = barHtml;
+
+            // Helper: render source cells
+            function srcCells(d) {
+                return SOURCES.map(s => `<td>${d[s]||0} <span class="pct">(${pct(d[s]||0,d.total)}%)</span></td>`).join('');
+            }
+
+            // Country table
+            const countries = Object.entries(data.byCountry).sort((a,b) => b[1].total - a[1].total);
+            let cHtml = '';
+            for (const [c, d] of countries) {
+                cHtml += `<tr><td>${FLAGS[c]||''} ${NAMES[c]||c}</td><td><strong>${d.total}</strong></td>${srcCells(d)}</tr>`;
+            }
+            cHtml += `<tr class="total-row"><td>TOTAL</td><td><strong>${t.total}</strong></td>${srcCells(t)}</tr>`;
+            document.querySelector('#countryTable tbody').innerHTML = cHtml;
+
+            // Daily table
+            const dates = Object.keys(data.daily).sort().reverse();
+            let dHtml = '';
+            for (const date of dates) {
+                const d = data.daily[date];
+                dHtml += `<tr><td>${date}</td><td><strong>${d.total}</strong></td>${srcCells(d)}</tr>`;
+            }
+            document.querySelector('#dailyTable tbody').innerHTML = dHtml;
+        }
+
+        // Default: today
+        setDay('today');
+    </script>
+</body>
+</html>

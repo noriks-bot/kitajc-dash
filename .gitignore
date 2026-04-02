@@ -1,0 +1,31 @@
+# Data files (contain real business data - do not commit)
+*.json
+!package.json
+!package-lock.json
+
+# Logs
+*.log
+server.log
+
+# Runtime
+node_modules/
+sessions.json
+users.json
+cache.json
+customer-history.json
+sku-overrides.json
+advertiser-cache.json
+fb-cr-cache.json
+landings-data.json
+live-events-data.json
+live-events-resolved.json
+origin-data.json
+upsell-data.json
+stock-data.json
+inventory-data.json
+mk-order-map.json
+rejection-data.json
+shipping-speed-data.json
+shipping-costs.json
+campaign-names.json
+payment-cache.json

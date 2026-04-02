@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advertiser Dashboard - Noriks</title>
+    <link rel="stylesheet" href="/dashboard/styles.css?v=20260309">
+    <style>
+        /* All card styles come from shared styles.css (.country-card, .country-stat, etc.) */
+        .section-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin: 32px 0 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .section-title:first-of-type { margin-top: 0; }
+        .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.7); display: none; align-items: center; justify-content: center; z-index: 999; flex-direction: column; gap: 12px; }
+        .loading-overlay.active { display: flex; }
+        .loading-overlay .spinner { width: 36px; height: 36px; border-width: 3px; }
+        .loading-overlay span:last-child { font-size: 14px; color: var(--text-secondary); font-weight: 500; }
+        
+        .country-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        @media (max-width: 800px) { .country-grid { grid-template-columns: 1fr; } }
+        .overall-products { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+        @media (max-width: 900px) { .overall-products { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 600px) { .overall-products { grid-template-columns: 1fr; gap: 10px; } }
+        
+        .adsets-pill { font-size: 10px; color: #6366f1; background: rgba(99,102,241,0.08); padding: 2px 8px; border-radius: 10px; }
+        .spend-comp { display: flex; gap: 16px; font-size: 13px; font-weight: 500; color: var(--text-secondary, #475569); padding: 6px 0; }
+        .products-section { border-top: 1px solid var(--border-color, #e2e8f0); padding-top: 10px; margin-top: 6px; }
+        .product-label { font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+        .product-label .adset-count { font-size: 10px; color: var(--text-light); font-weight: 400; }
+        
+        .green { color: #22c55e !important; }
+        .amber { color: #f59e0b !important; }
+        .red { color: #ef4444 !important; }
+        .table-card { margin-top: 24px; }
+        @media (max-width: 700px) {
+            .products-section .country-stats { margin-bottom: 4px; }
+            .spend-comp { font-size: 11px; flex-wrap: wrap; }
+        }
+    </style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head>
+<body>
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <aside class="sidebar"></aside>
+    
+    <div class="loading-overlay" id="loadingOverlay"><span class="spinner"></span><span>Loading data...</span></div>
+    <main class="main">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+                <h1 class="page-title">📊 Advertiser Dashboard</h1>
+            </div>
+            <div class="topbar-right">
+                <div class="status-badge">
+                    <span class="status-dot"></span>
+                    <span id="lastUpdated">Live</span>
+                </div>
+            </div>
+        </header>
+        
+        <div class="content">
+            <div class="data-info-banner">
+                <div class="info-left">
+                    <span class="info-icon">📡</span>
+                    <div class="info-text">
+                        <strong>Data Source:</strong> WooCommerce + Meta Ads
+                        <span class="info-sep">•</span>
+                        <strong>Last Sync:</strong> <span id="lastSyncTime">—</span>
+                    </div>
+                </div>
+                <span class="info-badge" id="dataRange">—</span>
+            </div>
+            
+            <div class="filters-section">
+                <div class="filters-left">
+                    <div class="filter-group">
+                        <span class="filter-label">Period</span>
+                        <div class="preset-tabs">
+                            <button class="preset-tab" onclick="setDay('today')" id="btn-today">Today</button>
+                            <button class="preset-tab" onclick="setDay('yesterday')" id="btn-yesterday">Yesterday</button>
+                            <button class="preset-tab" onclick="setPreset(3)" id="btn-3d">3D</button>
+                            <button class="preset-tab" onclick="setPreset(7)" id="btn-7d">7D</button>
+                            <button class="preset-tab" onclick="setPreset(14)" id="btn-14d">14D</button>
+                        </div>
+                        <input type="hidden" id="startDate">
+                        <input type="hidden" id="endDate">
+                    </div>
+                </div>
+                <button id="loadBtn" class="btn btn-primary" onclick="loadData()" style="display:none;">Apply</button>
+                <button id="refreshBtn" class="btn btn-primary" onclick="refreshData()" style="background:#10b981;">🔄 Refresh</button>
+            </div>
+            
+            <div id="error" class="error" style="display: none;"><span>⚠️</span><span id="errorText"></span></div>
+            
+            <!-- Overall Metrics -->
+            <div class="section-title">
+                🌍 Overall
+            </div>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">💳</div></div>
+                    <div class="metric-label">Total Spend</div>
+                    <div class="metric-value text-primary" id="totalSpend">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">🛒</div></div>
+                    <div class="metric-label">Orders</div>
+                    <div class="metric-value text-green" id="totalOrders">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">🎯</div></div>
+                    <div class="metric-label">CPA</div>
+                    <div class="metric-value text-amber" id="totalCPA">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">📈</div></div>
+                    <div class="metric-label">ROAS</div>
+                    <div class="metric-value text-cyan" id="totalROAS">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">💵</div></div>
+                    <div class="metric-label">Profit / Package</div>
+                    <div class="metric-value" id="totalProfitPerPkg">—</div>
+                </div>
+            </div>
+            <div id="overallBreakdown" style="margin-bottom:28px;">
+                <div id="overallProducts" class="overall-products"></div>
+            </div>
+            
+            <!-- Country Cards -->
+            <div class="section-title" style="justify-content:space-between;">
+                <span>🏳️ By Country</span>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <select id="sortBy" onchange="sortCards()" style="background:var(--card-bg,#fff);color:var(--text-primary,#1e293b);border:1px solid var(--border-color,#e2e8f0);border-radius:6px;padding:4px 8px;font-size:12px;">
+                        <option value="orders-desc">Orders ↓</option>
+                        <option value="orders-asc">Orders ↑</option>
+                        <option value="roas-desc">ROAS ↓</option>
+                        <option value="roas-asc">ROAS ↑</option>
+                        <option value="profit-desc">Profit ↓</option>
+                        <option value="profit-asc">Profit ↑</option>
+                        <option value="spend-desc">Spend ↓</option>
+                        <option value="spend-asc">Spend ↑</option>
+                    </select>
+                </div>
+            </div>
+            <div class="country-grid" id="countryGrid">
+                <div class="loading"><span class="spinner"></span> Loading...</div>
+            </div>
+            
+            <!-- Daily Chart -->
+            <div class="table-card" style="margin-bottom:20px;">
+                <div class="table-header">
+                    <div class="table-title">📊 Spend & Orders</div>
+                </div>
+                <div style="padding:16px;height:280px;">
+                    <canvas id="dailyChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Daily Table -->
+            <div class="table-card">
+                <div class="table-header">
+                    <div class="table-title">📋 Daily Overview</div>
+                </div>
+                <div class="table-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Spend</th>
+                                <th>Orders</th>
+                                <th>CPA</th>
+                                <th>ROAS</th>
+                                <th>Profit/Pkg</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <tr><td colspan="6" class="loading"><span class="spinner"></span> Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <script>
+        // Force light theme — clean up old dark theme from localStorage/DOM
+        localStorage.removeItem('theme');
+        document.documentElement.removeAttribute('data-theme');
+        
+        // Sidebar handled by sidebar.js
+        
+        const FLAGS = { HR: '🇭🇷', CZ: '🇨🇿', PL: '🇵🇱', GR: '🇬🇷', IT: '🇮🇹', HU: '🇭🇺', SK: '🇸🇰' };
+        const NAMES = { HR: 'Croatia', CZ: 'Czech Republic', PL: 'Poland', GR: 'Greece', IT: 'Italy', HU: 'Hungary', SK: 'Slovakia' };
+        
+        function formatDate(d) {
+            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        }
+        
+        function updateActiveTab(id) {
+            document.querySelectorAll('.preset-tab').forEach(t => t.classList.remove('active'));
+            const tab = document.getElementById('btn-' + id);
+            if (tab) tab.classList.add('active');
+        }
+        
+        function setPreset(days) {
+            const y = new Date(); y.setDate(y.getDate() - 1);
+            const s = new Date(y); s.setDate(s.getDate() - (days - 1));
+            document.getElementById('startDate').value = formatDate(s);
+            document.getElementById('endDate').value = formatDate(y);
+            updateActiveTab(days + 'd');
+            loadData();
+        }
+        
+        function setDay(which) {
+            let d;
+            if (which === 'today') {
+                d = new Date();
+            } else {
+                d = new Date(); d.setDate(d.getDate() - 1);
+            }
+            document.getElementById('startDate').value = formatDate(d);
+            document.getElementById('endDate').value = formatDate(d);
+            updateActiveTab(which);
+            loadData();
+        }
+        
+        setDay('today');
+        
+        function fmt(v) { return '€' + v.toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+        function fmtInt(v) { return '€' + v.toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+        
+        async function refreshData() {
+            const btn = document.getElementById('refreshBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;margin:0;"></span> Syncing...';
+            try {
+                const bp = window.location.pathname.startsWith('/advertiser') ? '/advertiser' : '/dashboard';
+                // Sync only today+yesterday with 45s timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 45000);
+                try {
+                    await fetch(bp + '/api/sync?days=2', { signal: controller.signal });
+                    clearTimeout(timeoutId);
+                } catch(e) { clearTimeout(timeoutId); console.warn('Sync timeout, using cached data'); }
+                // Force reload (bypass advertiser cache so fresh WC data shows)
+                await loadData(true);
+                btn.innerHTML = '✅ Done!';
+                setTimeout(() => { btn.innerHTML = '🔄 Refresh'; }, 2000);
+            } catch(e) { console.error(e); btn.innerHTML = '🔄 Refresh'; }
+            btn.disabled = false;
+        }
+        
+        async function loadData(forceRefresh) {
+            const btn = document.getElementById('loadBtn');
+            const errorDiv = document.getElementById('error');
+            const overlay = document.getElementById('loadingOverlay');
+            btn.disabled = true;
+            overlay.classList.add('active');
+            errorDiv.style.display = 'none';
+            
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            
+            try {
+                const basePath = window.location.pathname.startsWith('/advertiser') ? '/advertiser' : '/dashboard';
+                const dc = new AbortController();
+                const dt = setTimeout(() => dc.abort(), 45000);
+                const res = await fetch(`${basePath}/api/advertiser-data?start=${start}&end=${end}${forceRefresh ? '&refresh=1' : ''}`, { signal: dc.signal });
+                clearTimeout(dt);
+                if (!res.ok) throw new Error('API error');
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                
+                renderData(data);
+                
+                if (data.lastUpdate) {
+                    const updated = new Date(data.lastUpdate);
+                    const mins = Math.floor((new Date() - updated) / 60000);
+                    document.getElementById('lastUpdated').textContent = mins < 1 ? 'Just now' : mins + 'm ago';
+                    document.getElementById('lastSyncTime').textContent = updated.toLocaleString();
+                }
+                if (data.dates && data.dates.length > 0) {
+                    document.getElementById('dataRange').textContent = `${data.dates[0]} → ${data.dates[data.dates.length - 1]} (${data.dates.length} days)`;
+                }
+            } catch (e) {
+                document.getElementById('errorText').textContent = e.message;
+                errorDiv.style.display = 'flex';
+            } finally {
+                btn.disabled = false;
+                overlay.classList.remove('active');
+            }
+        }
+        
+        let _lastData = null;
+        
+        function sortCards() {
+            if (!_lastData) return;
+            renderData(_lastData);
+        }
+        
+        function rc(roas) { return roas >= 3 ? 'green' : roas >= 2 ? 'amber' : 'red'; }
+        function pc(p) { return p >= 0 ? 'green' : 'red'; }
+        function roasBadge(roas) { return roas >= 2 ? 'badge-green' : roas >= 1 ? 'badge-amber' : 'badge-red'; }
+        
+        function renderData(data) {
+            _lastData = data;
+            const countries = data.countries || [];
+            const ct = data.countryTotals || {};
+            const adsets = data.activeAdsets || {};
+            
+            // Sort countries
+            const sortVal = document.getElementById('sortBy')?.value || 'orders-desc';
+            const [field, dir] = sortVal.split('-');
+            const sorted = [...countries].filter(c => ct[c] && (ct[c].spend > 0 || ct[c].orders > 0));
+            sorted.sort((a, b) => {
+                const ta = ct[a], tb = ct[b];
+                let va, vb;
+                if (field === 'orders') { va = ta.orders; vb = tb.orders; }
+                else if (field === 'roas') { va = ta.spend > 0 ? ta.revenueGrossEur / ta.spend : 0; vb = tb.spend > 0 ? tb.revenueGrossEur / tb.spend : 0; }
+                else if (field === 'profit') { va = ta.orders > 0 ? ta.profit / ta.orders : -999; vb = tb.orders > 0 ? tb.profit / tb.orders : -999; }
+                else { va = ta.spend; vb = tb.spend; }
+                return dir === 'desc' ? vb - va : va - vb;
+            });
+            
+            // Overall metrics
+            let tSpend = 0, tOrders = 0, tRevGross = 0, tProfit = 0;
+            for (const c of countries) {
+                const t = ct[c];
+                if (!t) continue;
+                tSpend += t.spend;
+                tOrders += t.orders;
+                tRevGross += t.revenueGrossEur;
+                tProfit += t.profit;
+            }
+            
+            const tCPA = tOrders > 0 ? tSpend / tOrders : 0;
+            const tROAS = tSpend > 0 ? tRevGross / tSpend : 0;
+            const tProfitPerPkg = tOrders > 0 ? tProfit / tOrders : 0;
+            
+            document.getElementById('totalSpend').textContent = fmt(tSpend);
+            document.getElementById('totalOrders').textContent = tOrders.toLocaleString();
+            document.getElementById('totalCPA').textContent = fmt(tCPA);
+            document.getElementById('totalROAS').textContent = tROAS.toFixed(2) + 'x';
+            document.getElementById('totalROAS').className = 'metric-value ' + rc(tROAS);
+            document.getElementById('totalProfitPerPkg').textContent = fmt(tProfitPerPkg);
+            document.getElementById('totalProfitPerPkg').className = 'metric-value ' + pc(tProfitPerPkg);
+            
+            // Overall product breakdown
+            const prodTotals = {};
+            for (const c of countries) {
+                const t = ct[c];
+                if (!t) continue;
+                for (const [pName, pData] of Object.entries(t.products || {})) {
+                    if (!prodTotals[pName]) prodTotals[pName] = { spend: 0, orders: 0, revenueGrossEur: 0, profit: 0, activeAdsets: 0, wcOrders: 0, wcProfit: 0 };
+                    prodTotals[pName].spend += pData.spend || 0;
+                    prodTotals[pName].orders += pData.orders || 0;
+                    prodTotals[pName].revenueGrossEur += pData.revenueGrossEur || 0;
+                    prodTotals[pName].profit += pData.profit || 0;
+                    prodTotals[pName].activeAdsets += pData.activeAdsets || 0;
+                    prodTotals[pName].wcOrders += pData.wcOrders || 0;
+                    prodTotals[pName].wcProfit += pData.wcProfit || 0;
+                }
+            }
+            let prodHtml = '';
+            for (const [pName, p] of Object.entries(prodTotals)) {
+                const wcCpa = p.wcOrders > 0 ? p.spend / p.wcOrders : 0;
+                const wcRoas = p.wcOrders > 0 && p.spend > 0 ? p.revenueGrossEur / p.spend : null;
+                const wcProfitPkg = p.wcOrders > 0 ? p.wcProfit / p.wcOrders : 0;
+                const prodColor = pName.includes('Shirt') ? '#6366f1' : pName.includes('Boxer') ? '#f59e0b' : pName.includes('Starter') ? '#22c55e' : pName.includes('Komplet') ? '#ec4899' : '#64748b';
+                prodHtml += `<div class="country-card" style="border-top:none;border-left:4px solid ${prodColor};border-radius:10px;padding:16px;">
+                    <div class="country-header" style="margin-bottom:10px;">
+                        <div class="country-info"><span class="country-name" style="font-size:15px;font-weight:700;">${pName}</span></div>
+                        <span class="adsets-pill">${p.activeAdsets} adsets</span>
+                    </div>
+                    <div class="country-stats country-row-3">
+                        <div class="country-stat"><div class="country-stat-value">${fmtInt(p.spend)}</div><div class="country-stat-label">Spend</div></div>
+                        <div class="country-stat"><div class="country-stat-value">${p.orders}</div><div class="country-stat-label">FB Orders</div></div>
+                        <div class="country-stat"><div class="country-stat-value">${p.wcOrders}</div><div class="country-stat-label">WC Orders</div></div>
+                    </div>
+                    <div class="country-stats country-row-3">
+                        <div class="country-stat"><div class="country-stat-value">${p.wcOrders > 0 ? fmt(wcCpa) : '—'}</div><div class="country-stat-label">CPA</div></div>
+                        <div class="country-stat"><div class="country-stat-value ${wcRoas !== null ? rc(wcRoas) : ''}">${wcRoas !== null ? wcRoas.toFixed(2) + 'x' : '—'}</div><div class="country-stat-label">ROAS</div></div>
+                        <div class="country-stat"><div class="country-stat-value ${pc(wcProfitPkg)}">${p.wcOrders > 0 ? fmt(wcProfitPkg) : '—'}</div><div class="country-stat-label">Profit/Pkg</div></div>
+                    </div>
+                </div>`;
+            }
+            document.getElementById('overallProducts').innerHTML = prodHtml;
+            
+            // Country cards
+            let html = '';
+            for (const c of sorted) {
+                const t = ct[c];
+                
+                const cpa = t.orders > 0 ? t.spend / t.orders : 0;
+                const roas = t.spend > 0 ? t.revenueGrossEur / t.spend : 0;
+                const profitPerPkg = t.orders > 0 ? t.profit / t.orders : 0;
+                const activeCount = adsets[c] || 0;
+                const comp = (data.spendComparison || {})[c] || {};
+                const ydaySpend = comp.yesterdaySpend || 0;
+                const avg7d = comp.avg7dSpend || 0;
+                const vsPct = (ref) => { if (!ref) return ''; const pct = ((t.spend - ref) / ref * 100).toFixed(0); return pct >= 0 ? `<span class="green">▲${pct}%</span>` : `<span class="red">▼${Math.abs(pct)}%</span>`; };
+                
+                html += `<div class="country-card ${c.toLowerCase()}">
+                    <div class="country-header">
+                        <div class="country-info">
+                            <span class="country-flag">${FLAGS[c] || ''}</span>
+                            <span class="country-name">${NAMES[c] || c}</span>
+                            ${activeCount > 0 ? `<span class="adsets-pill">${activeCount} adsets</span>` : ''}
+                        </div>
+                        <div class="country-roas ${rc(roas)}">${roas.toFixed(2)}x</div>
+                    </div>
+                    <div class="country-stats country-row-3">
+                        <div class="country-stat"><div class="country-stat-value">${fmtInt(t.spend)}</div><div class="country-stat-label">Spend</div></div>
+                        <div class="country-stat"><div class="country-stat-value">${t.orders}</div><div class="country-stat-label">Orders</div></div>
+                        <div class="country-stat"><div class="country-stat-value">${t.orders > 0 ? fmt(cpa) : '—'}</div><div class="country-stat-label">CPA</div></div>
+                    </div>
+                    <div class="country-stats country-row-3">
+                        <div class="country-stat"><div class="country-stat-value ${pc(profitPerPkg)}">${fmt(profitPerPkg)}</div><div class="country-stat-label">Profit/Pkg</div></div>
+                        <div class="country-stat"><div class="country-stat-value">${fmtInt(t.revenueGrossEur)}</div><div class="country-stat-label">Revenue</div></div>
+                        <div class="country-stat"><div class="country-stat-value ${pc(t.profit)}">${fmtInt(t.profit)}</div><div class="country-stat-label">Profit</div></div>
+                    </div>
+                    <div class="spend-comp">
+                        <span>vs včeraj: €${ydaySpend.toFixed(2)} ${vsPct(ydaySpend)}</span>
+                        <span>vs 7d avg: €${avg7d.toFixed(2)} ${vsPct(avg7d)}</span>
+                    </div>
+                    <div class="products-section">`;
+                
+                const products = t.products || {};
+                const prodKeyMap = {'👕 Shirts':'Shirts','🩳 Boxers':'Boxers','📦 Starter Pack':'Starter','🎁 Kompleti':'Kompleti','📋 Catalog':'Catalog'};
+                for (const [pName, pData] of Object.entries(products)) {
+                    const wcOrd = pData.wcOrders || 0;
+                    const pCpa = wcOrd > 0 && pData.spend > 0 ? fmt(pData.spend / wcOrd) : '—';
+                    const pRoas = wcOrd > 0 && pData.spend > 0 ? pData.revenueGrossEur / pData.spend : null;
+                    const pAdsets = pData.activeAdsets || 0;
+                    const pk = prodKeyMap[pName] || '';
+                    const ydayProd = comp['yesterday'+pk] || 0;
+                    const avg7dProd = comp['avg7d'+pk] || 0;
+                    const vpct = (cur, ref) => { if (!ref) return ''; const p = ((cur - ref) / ref * 100).toFixed(0); return p >= 0 ? `<span class="green">▲${p}%</span>` : `<span class="red">▼${Math.abs(p)}%</span>`; };
+                    html += `<div class="product-label">${pName} <span class="adset-count">· ${pAdsets} adsets</span></div>
+                    <div class="country-stats country-row-4">
+                        <div class="country-stat"><div class="country-stat-value">${fmtInt(pData.spend)}</div><div class="country-stat-label">Spend</div></div>
+                        <div class="country-stat"><div class="country-stat-value">${wcOrd}</div><div class="country-stat-label">Orders</div></div>
+                        <div class="country-stat"><div class="country-stat-value">${pCpa}</div><div class="country-stat-label">CPA</div></div>
+                        <div class="country-stat"><div class="country-stat-value ${pRoas !== null ? rc(pRoas) : ''}">${pRoas !== null ? pRoas.toFixed(1) + 'x' : '—'}</div><div class="country-stat-label">ROAS</div></div>
+                    </div>
+                    <div class="spend-comp" style="padding-left:4px;margin-bottom:8px;">
+                        <span>vs včeraj €${ydayProd.toFixed(2)} ${vpct(pData.spend, ydayProd)}</span>
+                        <span>vs 7d €${avg7dProd.toFixed(2)} ${vpct(pData.spend, avg7dProd)}</span>
+                    </div>`;
+                }
+                
+                html += `</div></div>`;
+            }
+            document.getElementById('countryGrid').innerHTML = html || '<div>No data</div>';
+            
+            // Daily table — always last 14 days
+            const dailyData = data.daily14 || data.daily || {};
+            const daily14dates = Object.keys(dailyData).sort().reverse();
+            let tableHtml = '';
+            for (const date of daily14dates) {
+                const d = dailyData[date];
+                if (!d) continue;
+                const cpa = d.orders > 0 ? d.spend / d.orders : 0;
+                const roas = d.spend > 0 ? d.revenueGrossEur / d.spend : 0;
+                const profitPkg = d.orders > 0 ? d.profit / d.orders : 0;
+                tableHtml += `<tr>
+                    <td><strong>${date}</strong></td>
+                    <td>${fmt(d.spend)}</td>
+                    <td style="font-weight:700;">${d.orders}</td>
+                    <td style="font-weight:600;">${d.orders > 0 ? fmt(cpa) : '—'}</td>
+                    <td><span class="${rc(roas)}" style="font-weight:700;">${roas.toFixed(2)}x</span></td>
+                    <td class="${pc(profitPkg)}" style="font-weight:600;">${d.orders > 0 ? fmt(profitPkg) : '—'}</td>
+                </tr>`;
+            }
+            document.getElementById('tableBody').innerHTML = tableHtml || '<tr><td colspan="6" class="loading">No data</td></tr>';
+            
+            // Chart
+            const chartDates = daily14dates.slice().reverse();
+            const chartSpend = chartDates.map(d => (dailyData[d]?.spend || 0));
+            const chartOrders = chartDates.map(d => (dailyData[d]?.orders || 0));
+            const chartLabels = chartDates.map(d => { const p = d.split('-'); return p[2]+'.'+p[1]; });
+            
+            if (window._dailyChart) window._dailyChart.destroy();
+            const ctx = document.getElementById('dailyChart').getContext('2d');
+            const gridColor = 'rgba(0,0,0,0.08)';
+            const textColor = '#6b7280';
+            window._dailyChart = new Chart(ctx, {
+                data: {
+                    labels: chartLabels,
+                    datasets: [
+                        {
+                            type: 'bar',
+                            label: 'Spend €',
+                            data: chartSpend,
+                            backgroundColor: 'rgba(99,102,241,0.6)',
+                            borderRadius: 4,
+                            yAxisID: 'y',
+                            order: 2
+                        },
+                        {
+                            type: 'line',
+                            label: 'Orders',
+                            data: chartOrders,
+                            borderColor: '#22c55e',
+                            backgroundColor: 'rgba(34,197,94,0.1)',
+                            borderWidth: 2.5,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#22c55e',
+                            fill: true,
+                            tension: 0.3,
+                            yAxisID: 'y1',
+                            order: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { labels: { color: textColor, font: { size: 12 } } },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => ctx.dataset.label + ': ' + (ctx.dataset.type === 'bar' ? '€'+ctx.raw.toFixed(0) : ctx.raw)
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { color: textColor, font: { size: 11 } }, grid: { color: gridColor } },
+                        y: { position: 'left', title: { display: true, text: 'Spend €', color: textColor }, ticks: { color: textColor, callback: v => '€'+v }, grid: { color: gridColor } },
+                        y1: { position: 'right', title: { display: true, text: 'Orders', color: textColor }, ticks: { color: textColor, stepSize: 1 }, grid: { drawOnChartArea: false } }
+                    }
+                }
+            });
+        }
+        
+        async function logout() {
+            const bp = window.location.pathname.startsWith('/advertiser') ? '/advertiser' : '/dashboard';
+            await fetch(bp + '/api/logout');
+            window.location.href = bp + '/login';
+        }
+    </script>
+<script src="sidebar.js"></script>
+    <script src="/dashboard/sidebar.js"></script>
+    <script>renderSidebar('advertiser');</script>
+</body>
+</html>

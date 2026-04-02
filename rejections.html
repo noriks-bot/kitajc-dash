@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rejection Settings - Noriks Analytics</title>
+    <link rel="stylesheet" href="/dashboard/styles.css?v=20260224b">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+        
+        <aside class="sidebar"></aside>
+        
+        <main class="main">
+            <header class="topbar">
+                <div class="topbar-left">
+                    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+                    <h1 class="page-title">❌ Rejection Settings</h1>
+                </div>
+                <div class="topbar-right">
+                    <div class="status-badge">
+                        <span class="status-dot"></span>
+                        <span>Live</span>
+                    </div>
+                </div>
+            </header>
+            
+            <div class="content" style="max-width: 800px;">
+                <div class="info-card" style="background: var(--card-bg); border-radius: var(--card-radius); box-shadow: var(--card-shadow); padding: 20px; margin-bottom: 24px;">
+                    <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 16px;">
+                        Configure rejection/return rates per country. These values reduce net revenue and profit calculations.
+                    </p>
+                    <p style="color: var(--text-muted); font-size: 13px;">
+                        💡 Rejection rate represents the percentage of orders that are returned or rejected.
+                    </p>
+                </div>
+                
+                <div id="status-message" class="status-message"></div>
+                
+                <div class="table-card" style="background: var(--card-bg); border-radius: var(--card-radius); box-shadow: var(--card-shadow); padding: 20px;">
+                    <div id="content">
+                        <div class="loading"><span class="spinner"></span> Loading...</div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 24px; display: flex; justify-content: flex-end;">
+                    <button class="btn btn-primary" id="save-btn" onclick="saveSettings()" style="background: var(--primary); color: white; border: none; padding: 12px 24px; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                        💾 Save Changes
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="/dashboard/sidebar.js"></script>
+    <script>
+        // Render sidebar
+        renderSidebar('rejections');
+        
+        const COUNTRIES = [
+            { code: 'HR', name: 'Croatia', flag: '🇭🇷' },
+            { code: 'CZ', name: 'Czech Republic', flag: '🇨🇿' },
+            { code: 'PL', name: 'Poland', flag: '🇵🇱' },
+            { code: 'SK', name: 'Slovakia', flag: '🇸🇰' },
+            { code: 'HU', name: 'Hungary', flag: '🇭🇺' },
+            { code: 'GR', name: 'Greece', flag: '🇬🇷' },
+            { code: 'IT', name: 'Italy', flag: '🇮🇹' }
+        ];
+        
+        let currentSettings = {};
+        
+        async function loadSettings() {
+            try {
+                const res = await fetch('/dashboard/api/rejections');
+                const data = await res.json();
+                currentSettings = data.rejections || {};
+                renderTable();
+            } catch (e) {
+                document.getElementById('content').innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
+            }
+        }
+        
+        function renderTable() {
+            let html = `<table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--border-color); color: var(--text-secondary);">Country</th>
+                        <th style="text-align: right; padding: 12px; border-bottom: 1px solid var(--border-color); color: var(--text-secondary);">Rejection Rate</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+            
+            for (const country of COUNTRIES) {
+                const value = currentSettings[country.code] || 0;
+                html += `
+                    <tr>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--border-color);">
+                            <span style="font-size: 24px; margin-right: 12px;">${country.flag}</span>
+                            <span style="font-weight: 600;">${country.name} (${country.code})</span>
+                        </td>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--border-color); text-align: right;">
+                            <input type="number" 
+                                   style="width: 80px; text-align: right; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--content-bg); color: var(--text-primary);"
+                                   id="rejection-${country.code}" 
+                                   value="${value}" 
+                                   min="0" 
+                                   max="100"
+                                   step="0.1"
+                                   placeholder="0">
+                            <span style="color: var(--text-muted); margin-left: 8px; font-weight: 500;">%</span>
+                        </td>
+                    </tr>`;
+            }
+            
+            html += '</tbody></table>';
+            document.getElementById('content').innerHTML = html;
+        }
+        
+        async function saveSettings() {
+            const btn = document.getElementById('save-btn');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+            
+            const settings = {};
+            for (const country of COUNTRIES) {
+                const input = document.getElementById('rejection-' + country.code);
+                settings[country.code] = parseFloat(input.value) || 0;
+            }
+            
+            try {
+                const res = await fetch('/dashboard/api/rejections', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rejections: settings })
+                });
+                const data = await res.json();
+                
+                if (data.ok) {
+                    showStatus('✅ Rejection rates saved successfully!', 'success');
+                    currentSettings = settings;
+                } else {
+                    showStatus('❌ Error: ' + (data.error || 'Unknown error'), 'error');
+                }
+            } catch (e) {
+                showStatus('❌ Error: ' + e.message, 'error');
+            }
+            
+            btn.disabled = false;
+            btn.textContent = '💾 Save Changes';
+        }
+        
+        function showStatus(message, type) {
+            const el = document.getElementById('status-message');
+            el.textContent = message;
+            el.style.padding = '12px';
+            el.style.borderRadius = '6px';
+            el.style.marginBottom = '16px';
+            el.style.background = type === 'success' ? 'var(--success-soft)' : 'var(--danger-soft)';
+            el.style.color = type === 'success' ? 'var(--success)' : 'var(--danger)';
+            setTimeout(() => { el.textContent = ''; el.style.padding = '0'; }, 3000);
+        }
+        
+        loadSettings();
+    </script>
+</body>
+</html>

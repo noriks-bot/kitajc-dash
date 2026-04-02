@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Landings - Noriks</title>
+    <link rel="stylesheet" href="/dashboard/styles.css?v=20260317">
+    <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+    <style>
+        .landings-content {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 60px);
+            padding: 0;
+        }
+        .landings-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 24px;
+            border-bottom: 1px solid var(--border-color, #e2e8f0);
+            background: var(--card-bg, #fff);
+            flex-shrink: 0;
+        }
+        .landings-toolbar h2 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .landings-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .save-btn {
+            padding: 8px 20px;
+            background: var(--primary, #667eea);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        .save-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .save-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .save-btn.saved { background: #38a169; }
+        .save-status {
+            font-size: 13px;
+            color: var(--text-secondary, #666);
+        }
+        .editor-wrap {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        #editor {
+            flex: 1;
+            overflow-y: auto;
+            font-size: 15px;
+            line-height: 1.7;
+        }
+        #editor .ql-editor {
+            min-height: 100%;
+            padding: 24px 32px;
+        }
+        #editor .ql-editor a {
+            color: #667eea;
+            text-decoration: underline;
+        }
+        .ql-toolbar.ql-snow {
+            border: none !important;
+            border-bottom: 1px solid var(--border-color, #e2e8f0) !important;
+            background: var(--card-bg, #fff);
+            flex-shrink: 0;
+        }
+        .ql-container.ql-snow {
+            border: none !important;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        @media (max-width: 768px) {
+            #editor .ql-editor { padding: 16px; }
+            .landings-toolbar { padding: 10px 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <aside class="sidebar"></aside>
+
+    <main class="main">
+        <div class="landings-content">
+            <div class="landings-toolbar">
+                <h2>🛬 Landings Editor</h2>
+                <div class="landings-actions">
+                    <span class="save-status" id="saveStatus"></span>
+                    <button class="save-btn" id="saveBtn" onclick="saveContent()">
+                        💾 Save
+                    </button>
+                </div>
+            </div>
+            <div class="editor-wrap">
+                <div id="editor"></div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+    <script>
+        // Init Quill WYSIWYG editor
+        const quill = new Quill('#editor', {
+            theme: 'snow',
+            placeholder: 'Add your landing page links and notes here...',
+            modules: {
+                toolbar: [
+                    [{ 'header': [1, 2, 3, false] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    [{ 'color': [] }, { 'background': [] }],
+                    [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                    ['link', 'image'],
+                    ['blockquote', 'code-block'],
+                    [{ 'align': [] }],
+                    ['clean']
+                ]
+            }
+        });
+
+        // Load saved content
+        async function loadContent() {
+            try {
+                const res = await fetch('/dashboard/api/landings');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.content) {
+                        quill.root.innerHTML = data.content;
+                    }
+                    if (data.updatedAt) {
+                        document.getElementById('saveStatus').textContent = 'Last saved: ' + new Date(data.updatedAt).toLocaleString();
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to load landings content:', e);
+            }
+        }
+
+        // Save content
+        async function saveContent() {
+            const btn = document.getElementById('saveBtn');
+            const status = document.getElementById('saveStatus');
+            btn.disabled = true;
+            btn.textContent = '⏳ Saving...';
+
+            try {
+                const res = await fetch('/dashboard/api/landings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: quill.root.innerHTML })
+                });
+
+                if (res.ok) {
+                    btn.textContent = '✅ Saved!';
+                    btn.classList.add('saved');
+                    status.textContent = 'Last saved: ' + new Date().toLocaleString();
+                    setTimeout(() => {
+                        btn.textContent = '💾 Save';
+                        btn.classList.remove('saved');
+                        btn.disabled = false;
+                    }, 2000);
+                } else {
+                    throw new Error('Save failed');
+                }
+            } catch (e) {
+                btn.textContent = '❌ Error';
+                status.textContent = 'Save failed!';
+                setTimeout(() => {
+                    btn.textContent = '💾 Save';
+                    btn.disabled = false;
+                }, 2000);
+            }
+        }
+
+        // Keyboard shortcut: Ctrl+S to save
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                saveContent();
+            }
+        });
+
+        // Sidebar
+        function toggleSidebar() {
+            document.querySelector('.sidebar').classList.toggle('open');
+            document.querySelector('.sidebar-overlay').classList.toggle('active');
+        }
+        function logout() {
+            fetch('/dashboard/api/logout').then(() => { window.location.href = '/dashboard/login'; });
+        }
+
+        // Init
+        loadContent();
+    </script>
+    <script src="/dashboard/sidebar.js"></script>
+    <script>renderSidebar('landings');</script>
+</body>
+</html>

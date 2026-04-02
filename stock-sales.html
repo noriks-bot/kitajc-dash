@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Sales - Noriks Analytics</title>
+    <link rel="stylesheet" href="/dashboard/styles.css?v=20260320">
+    <style>
+        .sales-table { width: 100%; border-collapse: collapse; }
+        .sales-table th { text-align: right; padding: 12px 16px; border-bottom: 2px solid var(--border-color); color: var(--text-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; user-select: none; }
+        .sales-table th:first-child { text-align: left; }
+        .sales-table td { text-align: right; padding: 10px 16px; border-bottom: 1px solid var(--border-color); font-variant-numeric: tabular-nums; font-size: 14px; }
+        .sales-table td:first-child { text-align: left; font-weight: 500; }
+        .sales-table tr:hover { background: rgba(255,255,255,0.03); }
+        .sales-table .total-row { background: rgba(59,130,246,0.08); font-weight: 700; }
+        .sales-table .total-row td { border-bottom: 2px solid var(--border-color); padding: 14px 16px; }
+        .weekend { opacity: 0.6; }
+    </style>
+</head>
+<body>
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <aside class="sidebar"></aside>
+
+    <main class="main">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+                <h1 class="page-title">💰 Stock Sales</h1>
+            </div>
+            <div class="topbar-right">
+                <div class="status-badge">
+                    <span class="status-dot"></span>
+                    <span id="lastUpdated">Loading...</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="content">
+            <div class="data-info-banner">
+                <div class="info-left">
+                    <span class="info-icon">💰</span>
+                    <div class="info-text">
+                        <strong>Dnevna prodaja zaloge</strong> — koliko kosov in EUR vrednosti zaloge prodamo na dan
+                        <span class="info-sep">•</span>
+                        Stock value = kosi × 3.50 €/kos
+                    </div>
+                </div>
+            </div>
+
+            <div id="error" class="error" style="display:none;"><span>⚠️</span><span id="errorText"></span></div>
+
+            <!-- Summary metrics -->
+            <div class="metrics-grid" id="metricsGrid" style="display:none;">
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">📦</div></div>
+                    <div class="metric-label">Total Units Sold</div>
+                    <div class="metric-value" id="mUnits">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">👕</div></div>
+                    <div class="metric-label">Majice</div>
+                    <div class="metric-value" id="mShirts">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">🩳</div></div>
+                    <div class="metric-label">Bokserice</div>
+                    <div class="metric-value" id="mBoxers">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">💰</div></div>
+                    <div class="metric-label">Stock Value Sold</div>
+                    <div class="metric-value text-primary" id="mStockVal">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header"><div class="metric-icon">📊</div></div>
+                    <div class="metric-label">Avg/Day</div>
+                    <div class="metric-value text-green" id="mAvgDay">—</div>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="table-card" id="tableCard" style="display:none;">
+                <div class="table-header">
+                    <div class="table-title"><span style="font-size:16px;">📅</span> Daily Stock Sales — 2026</div>
+                </div>
+                <div class="table-scroll">
+                    <table class="sales-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left">Datum</th>
+                                <th>Orders</th>
+                                <th>Revenue €</th>
+                                <th>Stock Value €</th>
+                                <th>Kosi Skupaj</th>
+                                <th>👕 Majice</th>
+                                <th>🩳 Bokserice</th>
+                                <th>🧦 Nogavice</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/dashboard/sidebar.js"></script>
+    <script>
+        renderSidebar('stock-sales');
+
+        function fmt(n) { return n.toLocaleString('de-DE'); }
+        function fmtE(n) { return '€' + n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+        function isWeekend(dateStr) {
+            const d = new Date(dateStr + 'T12:00:00');
+            const day = d.getDay();
+            return day === 0 || day === 6;
+        }
+
+        function dayName(dateStr) {
+            const d = new Date(dateStr + 'T12:00:00');
+            return ['Ned','Pon','Tor','Sre','Čet','Pet','Sob'][d.getDay()];
+        }
+
+        async function loadData() {
+            try {
+                const resp = await fetch('/dashboard/api/stock-sales');
+                if (!resp.ok) throw new Error('API error: ' + resp.status);
+                const data = await resp.json();
+                if (data.error) throw new Error(data.error);
+                renderData(data);
+            } catch (e) {
+                document.getElementById('error').style.display = 'flex';
+                document.getElementById('errorText').textContent = e.message;
+            }
+        }
+
+        function renderData(data) {
+            const rows = data.rows || [];
+            document.getElementById('lastUpdated').textContent = data.generatedAt ? new Date(data.generatedAt).toLocaleTimeString() : 'Just now';
+
+            // Totals
+            let totalUnits = 0, totalShirts = 0, totalBoxers = 0, totalSocks = 0, totalStockVal = 0, totalRevenue = 0, totalOrders = 0;
+            for (const r of rows) {
+                totalUnits += r.totalUnits;
+                totalShirts += r.tshirts;
+                totalBoxers += r.boxers;
+                totalSocks += r.socks;
+                totalStockVal += r.stockValue;
+                totalRevenue += r.revenue;
+                totalOrders += r.orders || 0;
+            }
+
+            const days = rows.filter(r => r.totalUnits > 0).length;
+            const avgPerDay = days > 0 ? totalStockVal / days : 0;
+
+            document.getElementById('mUnits').textContent = fmt(totalUnits);
+            document.getElementById('mShirts').textContent = fmt(totalShirts);
+            document.getElementById('mBoxers').textContent = fmt(totalBoxers);
+            document.getElementById('mStockVal').textContent = fmtE(totalStockVal);
+            document.getElementById('mAvgDay').textContent = fmtE(avgPerDay) + '/dan';
+            document.getElementById('metricsGrid').style.display = 'grid';
+
+            // Table
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            // Total row first
+            tbody.innerHTML += `<tr class="total-row">
+                <td><strong>TOTAL 2026</strong></td>
+                <td><strong>${fmt(totalOrders)}</strong></td>
+                <td><strong>${fmtE(totalRevenue)}</strong></td>
+                <td><strong>${fmtE(totalStockVal)}</strong></td>
+                <td><strong>${fmt(totalUnits)}</strong></td>
+                <td><strong>${fmt(totalShirts)}</strong></td>
+                <td><strong>${fmt(totalBoxers)}</strong></td>
+                <td><strong>${fmt(totalSocks)}</strong></td>
+            </tr>`;
+
+            for (const r of rows) {
+                const we = isWeekend(r.date);
+                const dn = dayName(r.date);
+                tbody.innerHTML += `<tr class="${we ? 'weekend' : ''}">
+                    <td>${r.date} <span style="color:var(--text-muted);font-size:11px;">${dn}</span></td>
+                    <td>${fmt(r.orders || 0)}</td>
+                    <td>${fmtE(r.revenue)}</td>
+                    <td style="color:var(--primary);font-weight:600;">${fmtE(r.stockValue)}</td>
+                    <td style="font-weight:600;">${fmt(r.totalUnits)}</td>
+                    <td>${fmt(r.tshirts)}</td>
+                    <td>${fmt(r.boxers)}</td>
+                    <td>${r.socks > 0 ? fmt(r.socks) : '—'}</td>
+                </tr>`;
+            }
+
+            document.getElementById('tableCard').style.display = 'block';
+        }
+
+        loadData();
+    </script>
+</body>
+</html>

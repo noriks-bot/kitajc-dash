@@ -1,0 +1,12 @@
+{
+  "name": "kitajc-dash",
+  "version": "1.0.0",
+  "description": "Noriks Dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "node-cron": "^4.2.1"
+  }
+}

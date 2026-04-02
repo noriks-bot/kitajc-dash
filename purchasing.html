@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Purchasing - Noriks Analytics</title>
+    <link rel="stylesheet" href="/dashboard/styles.css?v=20260224f">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .filters-box {
+            display: flex;
+            gap: 20px;
+            padding: 16px 20px;
+            background: var(--card-bg);
+            border-radius: var(--card-radius);
+            box-shadow: var(--card-shadow);
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .filter-label {
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 13px;
+            white-space: nowrap;
+        }
+        .filter-select {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--content-bg);
+            color: var(--text-primary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        .clear-btn {
+            padding: 4px 8px;
+            border: none;
+            background: var(--border-color);
+            color: var(--text-secondary);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            margin-left: 4px;
+            transition: all 0.2s;
+        }
+        .clear-btn:hover {
+            background: var(--danger);
+            color: white;
+        }
+        .filter-toggles {
+            display: flex;
+            gap: 4px;
+        }
+        .filter-toggle {
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 2px solid var(--border-color);
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .filter-toggle:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        .filter-toggle.active {
+            border-color: var(--primary);
+            background: var(--primary);
+            color: white;
+        }
+        .filter-toggle.red.active { background: var(--danger); border-color: var(--danger); }
+        .filter-toggle.orange.active { background: var(--warning); border-color: var(--warning); }
+        .filter-toggle.green.active { background: var(--success); border-color: var(--success); }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+        
+        <aside class="sidebar"></aside>
+        
+        <main class="main">
+            <header class="topbar">
+                <div class="topbar-left">
+                    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+                    <h1 class="page-title">🛒 Purchasing Report</h1>
+                </div>
+                <div class="topbar-right">
+                    <button class="btn btn-secondary" onclick="exportCSV()" style="margin-right: 12px;">
+                        📥 Export CSV
+                    </button>
+                    <div class="status-badge">
+                        <span class="status-dot"></span>
+                        <span>Live</span>
+                    </div>
+                </div>
+            </header>
+            
+            <div class="content">
+                <!-- Summary Cards -->
+                <div class="metrics-grid" style="margin-bottom: 24px;">
+                    <div class="metric-card">
+                        <div class="metric-label">Lead Time</div>
+                        <div class="metric-value">40 dni</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Trend Period</div>
+                        <div class="metric-value" id="trend-display">7 dni</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">🔴 Rdeče (&lt;40 dni)</div>
+                        <div class="metric-value" id="critical-items" style="color: var(--danger);">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">🟠 Oranžne (40-100)</div>
+                        <div class="metric-value" id="warning-items" style="color: var(--warning);">-</div>
+                    </div>
+                </div>
+                
+                <!-- Info -->
+                <div class="info-card" style="background: var(--card-bg); border-radius: var(--card-radius); box-shadow: var(--card-shadow); padding: 16px; margin-bottom: 24px;">
+                    <p style="color: var(--text-secondary); font-size: 14px; margin: 0;">
+                        📊 <strong>Pregled nabave:</strong> Zaloga = trenutna + incoming. Trend = prodaja v izbranem obdobju.<br>
+                        🔴 <strong>Rdeče</strong> = &lt;40 dni (naroči!) | 🟠 <strong>Oranžne</strong> = 40-100 dni | 🟢 <strong>Zelene</strong> = 100+ dni (OK)
+                    </p>
+                </div>
+                
+                <!-- All Filters in White Box -->
+                <div class="filters-box">
+                    <div class="filter-group">
+                        <span class="filter-label">📈 Trend:</span>
+                        <select id="trend-select" class="filter-select" onchange="setTrendPeriod(this.value)">
+                            <option value="1">Včeraj</option>
+                            <option value="3">3 dni</option>
+                            <option value="7" selected>7 dni</option>
+                            <option value="14">14 dni</option>
+                            <option value="30">30 dni</option>
+                            <option value="365">2026</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <span class="filter-label">Simulacija:</span>
+                        <select id="sales-multiplier" class="filter-select" onchange="applyMultiplier()">
+                            <option value="1">1x</option>
+                            <option value="2">2x</option>
+                            <option value="3">3x</option>
+                            <option value="5">5x</option>
+                            <option value="10">10x</option>
+                            <option value="20">20x</option>
+                            <option value="50">50x</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <span class="filter-label">Prikaži:</span>
+                        <div class="filter-toggles">
+                            <button class="filter-toggle active" data-filter="all" onclick="setStatusFilter('all')">Vse</button>
+                            <button class="filter-toggle red" data-filter="critical" onclick="setStatusFilter('critical')">🔴</button>
+                            <button class="filter-toggle orange" data-filter="warning" onclick="setStatusFilter('warning')">🟠</button>
+                            <button class="filter-toggle green" data-filter="ok" onclick="setStatusFilter('ok')">🟢</button>
+                        </div>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <span class="filter-label">Produkt:</span>
+                        <select id="filter-product" class="filter-select" onchange="applyFilters()">
+                            <option value="">Vsi</option>
+                            <option value="T-Shirt">T-Shirt</option>
+                            <option value="Boxers">Boxers</option>
+                        </select>
+                        <button class="clear-btn" onclick="clearFilter('filter-product')" title="Clear">×</button>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <span class="filter-label">Barva:</span>
+                        <select id="filter-color" class="filter-select" onchange="applyFilters()">
+                            <option value="">Vse</option>
+                            <option value="Black">Black</option>
+                            <option value="Blue">Blue</option>
+                            <option value="Grey">Grey</option>
+                            <option value="Green">Green</option>
+                            <option value="Red">Red</option>
+                            <option value="White">White</option>
+                            <option value="Brown">Brown</option>
+                            <option value="Beige">Beige</option>
+                        </select>
+                        <button class="clear-btn" onclick="clearFilter('filter-color')" title="Clear">×</button>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <span class="filter-label">Velikost:</span>
+                        <select id="filter-size" class="filter-select" onchange="applyFilters()">
+                            <option value="">Vse</option>
+                            <option value="S">S</option>
+                            <option value="M">M</option>
+                            <option value="L">L</option>
+                            <option value="XL">XL</option>
+                            <option value="2XL">2XL</option>
+                            <option value="3XL">3XL</option>
+                            <option value="4XL">4XL</option>
+                        </select>
+                        <button class="clear-btn" onclick="clearFilter('filter-size')" title="Clear">×</button>
+                    </div>
+                </div>
+                
+                <!-- Stats Summary Box -->
+                <div class="stats-box" style="background: var(--card-bg); border-radius: var(--card-radius); box-shadow: var(--card-shadow); padding: 16px 20px; margin-bottom: 16px; display: flex; gap: 32px; flex-wrap: wrap;">
+                    <div id="trend-stats" style="display: flex; align-items: center; gap: 8px;">
+                        <span style="color: var(--text-secondary); font-size: 14px;">📈 Trend:</span>
+                        <span id="trend-total" style="font-weight: 600; color: var(--text-color);"></span>
+                    </div>
+                    <div id="sim-stats" style="display: none; align-items: center; gap: 8px;">
+                        <span style="color: var(--text-secondary); font-size: 14px;">🎯 Simulacija:</span>
+                        <span id="sim-total" style="font-weight: 600; color: var(--primary);"></span>
+                    </div>
+                </div>
+                
+                <!-- Table -->
+                <div class="table-card" style="background: var(--card-bg); border-radius: var(--card-radius); box-shadow: var(--card-shadow); overflow: hidden;">
+                    <div id="content">
+                        <div class="loading" style="padding: 40px; text-align: center;">
+                            <span class="spinner"></span> Loading purchasing data...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="/dashboard/sidebar.js"></script>
+    <script>
+        renderSidebar('purchasing');
+        
+        const LEAD_TIME_DAYS = 40;
+        const RED_THRESHOLD = 40;
+        const ORANGE_THRESHOLD = 100;
+        
+        let currentTrendDays = 7;
+        let currentStatusFilter = 'all';
+        let rawData = [];
+        let allData = [];
+        let sortColumn = 'daysOfStock';
+        let sortDirection = 'asc';
+        let periodItems = 0;
+        let periodOrders = 0;
+        
+        async function loadData() {
+            try {
+                const res = await fetch(`/dashboard/api/purchasing?all=true&trendDays=${currentTrendDays}`);
+                const data = await res.json();
+                
+                if (data.error) {
+                    document.getElementById('content').innerHTML = `<div style="padding: 40px; text-align: center; color: var(--danger);">Error: ${data.error}</div>`;
+                    return;
+                }
+                
+                rawData = data.items || [];
+                periodItems = data.periodItems || 0;
+                periodOrders = data.periodOrders || 0;
+                
+                const trendLabels = {1: '1 dan', 3: '3 dni', 7: '7 dni', 14: '14 dni', 30: '30 dni', 365: '2026'};
+                document.getElementById('trend-display').textContent = trendLabels[currentTrendDays] || `${currentTrendDays} dni`;
+                
+                applyMultiplier();
+            } catch (e) {
+                document.getElementById('content').innerHTML = `<div style="padding: 40px; text-align: center; color: var(--danger);">Error: ${e.message}</div>`;
+            }
+        }
+        
+        function setTrendPeriod(days) {
+            currentTrendDays = parseInt(days);
+            loadData();
+        }
+        
+        function setStatusFilter(filter) {
+            currentStatusFilter = filter;
+            document.querySelectorAll('.filter-toggle').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.filter === filter);
+            });
+            applyFilters();
+        }
+        
+        function applyMultiplier() {
+            const multiplier = parseFloat(document.getElementById('sales-multiplier').value) || 1;
+            
+            allData = rawData.map(item => {
+                const baseSalesPerDay = item.originalSalesPerDay || item.salesPerDay;
+                const newSalesPerDay = baseSalesPerDay * multiplier;
+                const newDaysOfStock = newSalesPerDay > 0 ? item.total / newSalesPerDay : Infinity;
+                const newDaysOfStockOnly = newSalesPerDay > 0 ? item.stock / newSalesPerDay : Infinity;
+                let newOrderQty = 0;
+                let newOrderQty80 = 0;
+                
+                if (newSalesPerDay > 0) {
+                    // Order 40d: always 40 × salesPerDay (fixed qty for 40 days)
+                    newOrderQty = Math.ceil(40 * newSalesPerDay);
+                    
+                    // Order 80d: always 80 × salesPerDay (fixed qty for 80 days)
+                    newOrderQty80 = Math.ceil(80 * newSalesPerDay);
+                }
+                
+                return {
+                    ...item,
+                    originalSalesPerDay: baseSalesPerDay,
+                    salesPerDay: newSalesPerDay,
+                    daysOfStock: newDaysOfStock,
+                    daysOfStockOnly: newDaysOfStockOnly,
+                    orderQty: newOrderQty,
+                    orderQty80: newOrderQty80
+                };
+            });
+            
+            // Update stats box
+            const trendLabels = {1: '1 dan', 3: '3 dni', 7: '7 dni', 14: '14 dni', 30: '30 dni', 365: '2026'};
+            const periodLabel = trendLabels[currentTrendDays] || `${currentTrendDays} dni`;
+            const effectiveDays = currentTrendDays === 365 ? 55 : currentTrendDays; // YTD ≈ 55 days
+            
+            // Use actual period totals from API
+            const itemsPerDay = periodItems / effectiveDays;
+            const ordersPerDay = periodOrders / effectiveDays;
+            const avgItemsPerOrder = periodOrders > 0 ? (periodItems / periodOrders).toFixed(1) : '-';
+            
+            document.getElementById('trend-total').textContent = 
+                `${periodOrders} naročil (${ordersPerDay.toFixed(1)}/dan) · ${periodItems} kosov (${itemsPerDay.toFixed(1)}/dan) · ⌀${avgItemsPerOrder} kos/naročilo`;
+            
+            // Simulation stats
+            const simStats = document.getElementById('sim-stats');
+            if (multiplier > 1) {
+                const simItemsPerDay = itemsPerDay * multiplier;
+                const simOrdersPerDay = ordersPerDay * multiplier;
+                document.getElementById('sim-total').textContent = 
+                    `${multiplier}x → ${simOrdersPerDay.toFixed(1)} naročil/dan · ${simItemsPerDay.toFixed(1)} kosov/dan`;
+                simStats.style.display = 'flex';
+            } else {
+                simStats.style.display = 'none';
+            }
+            
+            applyFilters();
+        }
+        
+        function clearFilter(selectId) {
+            document.getElementById(selectId).value = '';
+            applyFilters();
+        }
+        
+        function applyFilters() {
+            const productFilter = document.getElementById('filter-product').value;
+            const colorFilter = document.getElementById('filter-color').value;
+            const sizeFilter = document.getElementById('filter-size').value;
+            
+            let filtered = allData;
+            
+            if (productFilter) {
+                filtered = filtered.filter(i => i.product === productFilter);
+            }
+            
+            if (colorFilter) {
+                filtered = filtered.filter(i => i.color === colorFilter);
+            }
+            
+            if (sizeFilter) {
+                filtered = filtered.filter(i => i.size === sizeFilter);
+            }
+            
+            if (currentStatusFilter !== 'all') {
+                filtered = filtered.filter(i => {
+                    const status = getStatus(i.daysOfStock);
+                    return status.level === currentStatusFilter;
+                });
+            }
+            
+            renderTable(filtered);
+            updateSummary(allData);
+        }
+        
+        function updateSummary(items) {
+            const critical = items.filter(i => i.daysOfStock < RED_THRESHOLD).length;
+            const warning = items.filter(i => i.daysOfStock >= RED_THRESHOLD && i.daysOfStock < ORANGE_THRESHOLD).length;
+            
+            document.getElementById('critical-items').textContent = critical;
+            document.getElementById('warning-items').textContent = warning;
+        }
+        
+        function sortTable(column) {
+            if (sortColumn === column) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortColumn = column;
+                sortDirection = column === 'salesPerDay' ? 'desc' : 'asc';
+            }
+            applyFilters();
+        }
+        
+        function renderTable(items) {
+            if (!items.length) {
+                document.getElementById('content').innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-muted);">Ni podatkov za izbrane filtre.</div>';
+                return;
+            }
+            
+            // Sort by selected column (default: daysOfStock ascending)
+            const sorted = [...items].sort((a, b) => {
+                let valA = a[sortColumn];
+                let valB = b[sortColumn];
+                
+                if (valA === Infinity) valA = 999999;
+                if (valB === Infinity) valB = 999999;
+                
+                if (typeof valA === 'string') {
+                    return sortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                }
+                
+                return sortDirection === 'asc' ? valA - valB : valB - valA;
+            });
+            
+            const arrow = (col) => sortColumn === col ? (sortDirection === 'asc' ? ' ▲' : ' ▼') : '';
+            const thStyle = 'text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 600; cursor: pointer; user-select: none;';
+            const thStyleRight = 'text-align: right; padding: 12px 16px; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 600; cursor: pointer; user-select: none;';
+            
+            let html = `
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: var(--content-bg);">
+                            <th style="${thStyle}">Status</th>
+                            <th style="${thStyle}" onclick="sortTable('product')">Product${arrow('product')}</th>
+                            <th style="${thStyle}" onclick="sortTable('color')">Color${arrow('color')}</th>
+                            <th style="${thStyle}" onclick="sortTable('size')">Size${arrow('size')}</th>
+                            <th style="${thStyleRight}" onclick="sortTable('stock')">Stock${arrow('stock')}</th>
+                            <th style="${thStyleRight}" onclick="sortTable('incoming')">Incoming${arrow('incoming')}</th>
+                            <th style="${thStyleRight}" onclick="sortTable('total')">Total${arrow('total')}</th>
+                            <th style="${thStyleRight}" onclick="sortTable('salesPerDay')">Sales/Day${arrow('salesPerDay')}</th>
+                            <th style="${thStyleRight}" onclick="sortTable('daysOfStockOnly')">Days (Stock)${arrow('daysOfStockOnly')}</th>
+                            <th style="${thStyleRight}" onclick="sortTable('daysOfStock')">Days (S+I)${arrow('daysOfStock')}</th>
+                            <th style="${thStyleRight}" onclick="sortTable('orderQty')">Order 40d${arrow('orderQty')}</th>
+                            <th style="${thStyleRight}" onclick="sortTable('orderQty80')">Order 80d${arrow('orderQty80')}</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+            
+            for (const item of sorted) {
+                const status = getStatus(item.daysOfStock);
+                let rowBg = '';
+                if (item.daysOfStock < RED_THRESHOLD) rowBg = 'rgba(239, 68, 68, 0.15)';
+                else if (item.daysOfStock < ORANGE_THRESHOLD) rowBg = 'rgba(245, 158, 11, 0.15)';
+                else rowBg = 'rgba(34, 197, 94, 0.08)';
+                
+                html += `
+                    <tr style="background: ${rowBg};">
+                        <td style="padding: 12px 16px; border-bottom: 1px solid var(--border-color);">
+                            <span title="${status.text}">${status.icon}</span>
+                        </td>
+                        <td style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); font-weight: 500;">${item.product}</td>
+                        <td style="padding: 12px 16px; border-bottom: 1px solid var(--border-color);">${item.color}</td>
+                        <td style="padding: 12px 16px; border-bottom: 1px solid var(--border-color);">${item.size}</td>
+                        <td style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); text-align: right;">${item.stock}</td>
+                        <td style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); text-align: right; color: var(--primary);">${item.incoming}</td>
+                        <td style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); text-align: right; font-weight: 600;">${item.total}</td>
+                        <td style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); text-align: right; font-weight: 600; color: var(--primary);">${item.salesPerDay.toFixed(2)}</td>
+                        <td style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); text-align: right; font-weight: 600; color: ${getStatus(item.daysOfStockOnly).color};">${item.daysOfStockOnly === Infinity ? '∞' : Math.round(item.daysOfStockOnly)}</td>
+                        <td style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); text-align: right; font-weight: 600; color: ${status.color};">${item.daysOfStock === Infinity ? '∞' : Math.round(item.daysOfStock)}</td>
+                        <td style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); text-align: right; font-weight: 700; color: var(--primary);">${item.orderQty > 0 ? item.orderQty : '-'}</td>
+                        <td style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); text-align: right; font-weight: 600; color: var(--text-secondary);">${item.orderQty80 > 0 ? item.orderQty80 : '-'}</td>
+                    </tr>`;
+            }
+            
+            html += '</tbody></table>';
+            document.getElementById('content').innerHTML = html;
+        }
+        
+        function getStatus(days) {
+            if (days < RED_THRESHOLD) return { icon: '🔴', text: 'Kritično - Naroči!', level: 'critical', color: 'var(--danger)' };
+            if (days < ORANGE_THRESHOLD) return { icon: '🟠', text: 'Opozorilo - Kmalu naroči', level: 'warning', color: 'var(--warning)' };
+            return { icon: '🟢', text: 'OK', level: 'ok', color: 'var(--success)' };
+        }
+        
+        function exportCSV() {
+            if (!allData.length) return;
+            
+            const headers = ['Status', 'Product', 'Color', 'Size', 'Stock', 'Incoming', 'Total', 'Sales/Day', 'Days (Stock)', 'Days (S+I)', 'Order 40d', 'Order 80d'];
+            const rows = allData.map(item => [
+                getStatus(item.daysOfStock).level,
+                item.product,
+                item.color,
+                item.size,
+                item.stock,
+                item.incoming,
+                item.total,
+                item.salesPerDay.toFixed(2),
+                item.daysOfStockOnly === Infinity ? '∞' : Math.round(item.daysOfStockOnly),
+                item.daysOfStock === Infinity ? '∞' : Math.round(item.daysOfStock),
+                item.orderQty,
+                item.orderQty80
+            ]);
+            
+            let csv = headers.join(',') + '\n';
+            csv += rows.map(r => r.join(',')).join('\n');
+            
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `purchasing-report-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+        }
+        
+        loadData();
+    </script>
+</body>
+</html>
