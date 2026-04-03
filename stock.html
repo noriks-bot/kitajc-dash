@@ -320,6 +320,8 @@ async function loadData() {
     try {
         const r = await fetch('/dashboard/api/kitajc-stock');
         _items = await r.json();
+        // Sort by sold_all descending by default
+        _items.sort((a, b) => (b.sold_all || 0) - (a.sold_all || 0));
         render(_items);
         document.getElementById('updated-at').textContent = 'Posodobljeno ' + new Date().toLocaleTimeString('sl-SI');
     } catch(e) {
