@@ -942,14 +942,22 @@ async function syncFullYear() {
             const orderShippingCost = shippingCosts[country] || 0;
             byDate[date].shippingCost += orderShippingCost;
             
-            // Count products
+            // Count products + SKU-based product cost (from kitajc-stock.json)
             if (order.line_items) {
+                const stockItems = loadKitajcStock();
+                const skuCostMap = {};
+                for (const s of stockItems) skuCostMap[(s.sku||'').toUpperCase()] = s.purchase_price || 0;
                 for (const item of order.line_items) {
                     const product = detectProduct(item.name, true, item.meta_data, item.sku);
                     const lineQty = item.quantity || 1;
                     byDate[date].tshirts += (product.tshirts || 0) * lineQty;
                     byDate[date].boxers += (product.boxers || 0) * lineQty;
                     byDate[date].socks += (product.socks || 0) * lineQty;
+                    // Add SKU-based cost
+                    const sku = (item.sku || '').toUpperCase().trim();
+                    const skuCost = skuCostMap[sku] || 0;
+                    if (!byDate[date].sku_product_cost) byDate[date].sku_product_cost = 0;
+                    byDate[date].sku_product_cost += skuCost * lineQty;
                 }
             }
             
@@ -1029,8 +1037,11 @@ async function syncFullYear() {
             const newRevenueEur = newGrossEur * (1 - rejectionRate) / (1 + vatRate);
             const retRevenueEur = retGrossEur * (1 - rejectionRate) / (1 + vatRate);
             
-            // Product cost - apply rejection rate (we get products back for rejected orders)
-            const productCost = (data.tshirts * PRODUCT_COSTS.tshirt) + (data.boxers * PRODUCT_COSTS.boxers);
+            // Product cost — use SKU-based cost from kitajc-stock.json if available, else fallback to PRODUCT_COSTS
+            const rawProductCost = (data.sku_product_cost || 0) > 0
+                ? (data.sku_product_cost || 0)
+                : (data.tshirts * PRODUCT_COSTS.tshirt) + (data.boxers * PRODUCT_COSTS.boxers);
+            const productCost = rawProductCost;
             const effectiveProductCost = productCost * (1 - rejectionRate);
             
             // Shipping stays at 100% (we pay for all shipments including rejected)
@@ -1060,6 +1071,7 @@ async function syncFullYear() {
                 boxers: data.boxers,
                 socks: data.socks || 0,
                 product_cost: Math.round(productCost * 100) / 100,
+                sku_product_cost: Math.round((data.sku_product_cost || 0) * 100) / 100,
                 effective_product_cost: Math.round(effectiveProductCost * 100) / 100,
                 shipping_cost: Math.round(shippingCost * 100) / 100,
                 profit: Math.round(profit * 100) / 100,
@@ -1392,12 +1404,20 @@ async function syncRecent(daysBack = 7) {
             }
             
             if (order.line_items) {
+                const stockItems2 = loadKitajcStock();
+                const skuCostMap2 = {};
+                for (const s of stockItems2) skuCostMap2[(s.sku||'').toUpperCase()] = s.purchase_price || 0;
                 for (const item of order.line_items) {
                     const product = detectProduct(item.name, true, item.meta_data, item.sku);
                     const lineQty = item.quantity || 1;
                     byDate[date].tshirts += (product.tshirts || 0) * lineQty;
                     byDate[date].boxers += (product.boxers || 0) * lineQty;
                     byDate[date].socks += (product.socks || 0) * lineQty;
+                    // SKU-based cost
+                    const sku2 = (item.sku || '').toUpperCase().trim();
+                    const skuCost2 = skuCostMap2[sku2] || 0;
+                    if (!byDate[date].sku_product_cost) byDate[date].sku_product_cost = 0;
+                    byDate[date].sku_product_cost += skuCost2 * lineQty;
                 }
             }
             
@@ -1477,8 +1497,11 @@ async function syncRecent(daysBack = 7) {
             const newRevenueEur = newGrossEur * (1 - rejectionRate) / (1 + vatRate);
             const retRevenueEur = retGrossEur * (1 - rejectionRate) / (1 + vatRate);
             
-            // Product cost - apply rejection rate (we get products back for rejected orders)
-            const productCost = (data.tshirts * PRODUCT_COSTS.tshirt) + (data.boxers * PRODUCT_COSTS.boxers);
+            // Product cost — use SKU-based cost from kitajc-stock.json if available, else fallback to PRODUCT_COSTS
+            const rawProductCost = (data.sku_product_cost || 0) > 0
+                ? (data.sku_product_cost || 0)
+                : (data.tshirts * PRODUCT_COSTS.tshirt) + (data.boxers * PRODUCT_COSTS.boxers);
+            const productCost = rawProductCost;
             const effectiveProductCost = productCost * (1 - rejectionRate);
             
             // Shipping stays at 100% (we pay for all shipments including rejected)
@@ -1508,6 +1531,7 @@ async function syncRecent(daysBack = 7) {
                 boxers: data.boxers,
                 socks: data.socks || 0,
                 product_cost: Math.round(productCost * 100) / 100,
+                sku_product_cost: Math.round((data.sku_product_cost || 0) * 100) / 100,
                 effective_product_cost: Math.round(effectiveProductCost * 100) / 100,
                 shipping_cost: Math.round(shippingCost * 100) / 100,
                 profit: Math.round(profit * 100) / 100,
