@@ -106,6 +106,12 @@ function loadKitajcStock() {
 }
 function saveKitajcStock(data) {
     fs.writeFileSync(KITAJC_STOCK_FILE, JSON.stringify(data, null, 2));
+    // Daily backup
+    const today = new Date().toISOString().split('T')[0];
+    const backupFile = path.join(__dirname, `kitajc-stock.${today}.bak.json`);
+    if (!fs.existsSync(backupFile)) {
+        fs.writeFileSync(backupFile, JSON.stringify(data, null, 2));
+    }
 }
 // Init default stock if file missing
 if (!fs.existsSync(KITAJC_STOCK_FILE)) {
@@ -4568,12 +4574,28 @@ server.listen(PORT, '0.0.0.0', async () => {
     }, 2 * 60 * 1000);
     console.log('[LIVE-EVENTS] Auto-refresh every 2 minutes');
 
-    // Kitajc stock sales — refresh every hour
+    // Kitajc stock sales — refresh every hour + low stock warning
     setInterval(() => {
         _kitajcSalesCache = null; // invalidate cache
         getKitajcSkuSales()
-            .then(r => console.log('[KITAJC-STOCK] Hourly refresh done. Today:', JSON.stringify(r.salesToday)))
+            .then(r => {
+                console.log('[KITAJC-STOCK] Hourly refresh done. Today:', JSON.stringify(r.salesToday));
+                // Check low stock
+                const items = loadKitajcStock();
+                for (const item of items) {
+                    const sku = (item.sku || '').toUpperCase();
+                    const sold = r.salesAll[sku] || 0;
+                    const remaining = Math.max(0, (item.initial_quantity || 0) - sold);
+                    if (remaining <= 50 && remaining > 0) {
+                        console.warn(`[KITAJC-STOCK] ⚠️ LOW STOCK: ${item.name} (${sku}) — samo ${remaining} kos ostane!`);
+                    } else if (remaining === 0) {
+                        console.warn(`[KITAJC-STOCK] 🔴 IZČRPANO: ${item.name} (${sku})`);
+                    }
+                }
+            })
             .catch(e => console.error('[KITAJC-STOCK] Hourly refresh failed:', e.message));
     }, 60 * 60 * 1000);
+    // Also run immediately on startup
+    getKitajcSkuSales().catch(() => {});
     console.log('[KITAJC-STOCK] Hourly sales refresh scheduled');
 });
