@@ -192,6 +192,7 @@
                                 <th>Ime izdelka</th>
                                 <th>Nabavna cena</th>
                                 <th>Količina</th>
+                                <th>Prodaje</th>
                                 <th>Status</th>
                                 <th>Vrednost zalog</th>
                             </tr>
@@ -229,13 +230,15 @@ function render() {
     const tbody = document.getElementById('stock-tbody');
     const tfoot = document.getElementById('stock-tfoot');
     if (!items.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty">Ni še nobenih izdelkov. Dodaj prvega zgoraj.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="empty">Ni še nobenih izdelkov. Dodaj prvega zgoraj.</td></tr>';
         tfoot.innerHTML = '';
         return;
     }
     let total = 0;
     tbody.innerHTML = items.map((item, i) => {
-        const val = (item.purchase_price || 0) * (item.quantity || 0);
+        const qty = item.quantity || 0;
+        const sold = item.sold || 0;
+        const val = (item.purchase_price || 0) * qty;
         total += val;
         return `<tr>
             <td>${i+1}</td>
@@ -243,17 +246,33 @@ function render() {
             <td><span class="editable-price" onclick="editPrice(${i})" title="Klikni za urejanje">€ ${Number(item.purchase_price||0).toFixed(2)}</span></td>
             <td><div class="qty-cell">
                 <button class="qty-btn" onclick="chQty(${i},-1)">−</button>
-                <span class="qty-val">${item.quantity||0}</span>
+                <span class="qty-val">${qty}</span>
                 <button class="qty-btn" onclick="chQty(${i},+1)">+</button>
             </div></td>
-            <td>${badge(item.quantity||0)}</td>
+            <td><div class="qty-cell">
+                <button class="qty-btn" onclick="chSold(${i},-1)">−</button>
+                <span class="qty-val">${sold}</span>
+                <button class="qty-btn" onclick="chSold(${i},+1)">+</button>
+            </div></td>
+            <td>${badge(qty)}</td>
             <td>€ ${val.toFixed(2)}</td>
         </tr>`;
     }).join('');
     tfoot.innerHTML = `<tr class="tfoot-row">
-        <td colspan="4" style="text-align:right;padding-right:12px;">Skupna vrednost zalog:</td>
+        <td colspan="5" style="text-align:right;padding-right:12px;">Skupna vrednost zalog:</td>
         <td colspan="2">€ ${total.toFixed(2)}</td>
     </tr>`;
+}
+
+function chSold(i, d) {
+    const items = loadStock();
+    const prev = items[i].sold || 0;
+    const newSold = Math.max(0, prev + d);
+    const delta = newSold - prev; // how much sold changed
+    items[i].sold = newSold;
+    // subtract from quantity when adding sales
+    items[i].quantity = Math.max(0, (items[i].quantity || 0) - delta);
+    saveStock(items); render();
 }
 
 function editPrice(i) {
@@ -307,6 +326,23 @@ function doLogout() {
 fetch('/dashboard/api/me').then(r => r.json()).then(d => {
     if (d.username) document.getElementById('username-display').textContent = d.username;
 }).catch(() => {});
+
+// Pre-populate with initial data if stock is empty
+(function() {
+    const existing = loadStock();
+    if (existing.length === 0) {
+        const initial = [
+            { name: 'nekitig',  purchase_price: 4.69, quantity: 3912, sold: 0 },
+            { name: 'elemas',   purchase_price: 6.85, quantity: 1008, sold: 0 },
+            { name: 'secug',    purchase_price: 3.36, quantity: 828,  sold: 0 },
+            { name: 'felifun',  purchase_price: 4.00, quantity: 600,  sold: 0 },
+            { name: 'frypan',   purchase_price: 2.73, quantity: 2016, sold: 0 },
+            { name: 'prskalica',purchase_price: 3.02, quantity: 2040, sold: 0 },
+            { name: 'defrost',  purchase_price: 3.00, quantity: 1000, sold: 0 },
+        ];
+        saveStock(initial);
+    }
+})();
 
 ['inp-name','inp-price','inp-qty'].forEach(id =>
     document.getElementById(id).addEventListener('keydown', e => { if (e.key==='Enter') addProduct(); })
