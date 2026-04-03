@@ -18,13 +18,11 @@ const INVENTORY_PATH = path.join(__dirname, 'inventory-data.json');
 
 // WooCommerce stores - ALL stores share same inventory
 const STORES = [
-    { name: 'HR', url: 'https://noriks.com/hr', ck: 'YOUR_WC_CONSUMER_KEY', cs: 'YOUR_WC_CONSUMER_SECRET' },
-    { name: 'CZ', url: 'https://noriks.com/cz', ck: 'YOUR_WC_CONSUMER_KEY', cs: 'YOUR_WC_CONSUMER_SECRET' },
-    { name: 'PL', url: 'https://noriks.com/pl', ck: 'YOUR_WC_CONSUMER_KEY', cs: 'YOUR_WC_CONSUMER_SECRET' },
-    { name: 'GR', url: 'https://noriks.com/gr', ck: 'YOUR_WC_CONSUMER_KEY', cs: 'YOUR_WC_CONSUMER_SECRET' },
-    { name: 'SK', url: 'https://noriks.com/sk', ck: 'YOUR_WC_CONSUMER_KEY', cs: 'YOUR_WC_CONSUMER_SECRET' },
-    { name: 'IT', url: 'https://noriks.com/it', ck: 'YOUR_WC_CONSUMER_KEY', cs: 'YOUR_WC_CONSUMER_SECRET' },
-    { name: 'HU', url: 'https://noriks.com/hu', ck: 'YOUR_WC_CONSUMER_KEY', cs: 'YOUR_WC_CONSUMER_SECRET' }
+    { name: 'HR', url: 'https://hr.shopdbestshop.eu', ck: 'ck_44df26f997ba97a163d3d194fb595550510bd36d', cs: 'cs_a848394041c4cdb0bc6e20803dda3864d0450adf' },
+    { name: 'CZ', url: 'https://cz.shopdbestshop.eu', ck: 'ck_457cd6c863af7d67d7c0bd30b96a2a2a7f639b4d', cs: 'cs_75f62777bbc6b041dd8c8f8d8781bcc929f952f8' },
+    { name: 'PL', url: 'https://pl.shopdbestshop.eu', ck: 'ck_095b14dce8d13379bd4c464aed2ca7d204853b31', cs: 'cs_f72ffbf1d7f7c20a8b9fd3d490ede5cdc21e234a' },
+    { name: 'HU', url: 'https://hu.shopdbestshop.eu', ck: 'ck_19fc252ae26001b8f0c6c0da4e36187b2e9dbb20', cs: 'cs_c8eb8c74f6bb1a4b2d0ce79044daf62d2d91106e' },
+    { name: 'SK', url: 'https://sk.shopdbestshop.eu', ck: 'ck_b6fbddd1f340818b408e8ef011951b6cb906932f', cs: 'cs_d008c33f622b4066a29ff7fa67870f8a39057aaf' }
 ];
 
 // Color mappings - ALL languages (HR, CZ, PL, GR, SK, IT, HU)

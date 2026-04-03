@@ -9,7 +9,8 @@ const { execFile } = require('child_process');
 const { detectProduct: _sharedDetectProduct, setSkuOverrides: _setSharedOverrides } = require('./detect-product');
 const { fetchSales } = require('./fetch-sales');
 
-const PORT = 3000;
+const PORT = 3010;
+const STORE_START_DATE = "2026-04-01"; // Kitajc launch date - never fetch orders before this date
 const CACHE_FILE = path.join(__dirname, 'cache.json');
 const SKU_OVERRIDES_FILE = path.join(__dirname, 'sku-overrides.json');
 const CUSTOMER_HISTORY_FILE = path.join(__dirname, 'customer-history.json');
@@ -34,10 +35,10 @@ try { liveEventsResolved = JSON.parse(fs.readFileSync(LIVE_EVENTS_RESOLVED_FILE,
 function saveLiveEventsResolved() { try { fs.writeFileSync(LIVE_EVENTS_RESOLVED_FILE, JSON.stringify(liveEventsResolved)); } catch(e) {} }
 let advertiserCache = {};
 const ORIGIN_DATA_FILE = path.join(__dirname, 'origin-data.json');
-// Master origin data: { daily: { "2026-01-01": { "HR": { Facebook:X, ... }, "CZ": {...} }, ... }, generatedAt: "..." }
+// Master origin data: { daily: { STORE_START_DATE: { "HR": { Facebook:X, ... }, "CZ": {...} }, ... }, generatedAt: "..." }
 let originData = { daily: {}, generatedAt: null };
 const UPSELL_DATA_FILE = path.join(__dirname, 'upsell-data.json');
-// Upsell cache: { daily: { "2026-01-01": { "HR": { orders: N, upsellOrders: N, upsellRevenue: N, byType: {...} }, ... }, ... }, generatedAt: "..." }
+// Upsell cache: { daily: { STORE_START_DATE: { "HR": { orders: N, upsellOrders: N, upsellRevenue: N, byType: {...} }, ... }, ... }, generatedAt: "..." }
 let upsellData = { daily: {}, generatedAt: null };
 try { if (fs.existsSync(UPSELL_DATA_FILE)) upsellData = JSON.parse(fs.readFileSync(UPSELL_DATA_FILE, 'utf8')); } catch(e) {}
 function saveUpsellData() { try { fs.writeFileSync(UPSELL_DATA_FILE, JSON.stringify(upsellData)); upsellData.generatedAt = new Date().toISOString(); } catch(e) { console.error('Upsell data save failed:', e.message); } }
@@ -389,7 +390,7 @@ function loadCustomerHistory() {
             const loaded = JSON.parse(fs.readFileSync(CUSTOMER_HISTORY_FILE, 'utf8'));
             customerHistory = loaded.customerHistory || { HR: {}, CZ: {}, PL: {}, GR: {}, IT: {}, HU: {}, SK: {} };
             // Ensure all countries exist
-            for (const c of ['HR', 'CZ', 'PL', 'GR', 'IT', 'HU', 'SK']) {
+            for (const c of ['HR', 'CZ', 'PL', 'HU', 'SK']) {
                 if (!customerHistory[c]) customerHistory[c] = {};
             }
             fullSyncCompleted = loaded.fullSyncCompleted || false;
@@ -411,18 +412,16 @@ function saveCustomerHistory() {
 
 // Config
 const config = {
-    HR: { url: 'https://noriks.com/hr/wp-json/wc/v3', key: 'YOUR_WC_CONSUMER_KEY', secret: 'YOUR_WC_CONSUMER_SECRET', currency: 'EUR', rate: 1 },
-    CZ: { url: 'https://noriks.com/cz/wp-json/wc/v3', key: 'YOUR_WC_CONSUMER_KEY', secret: 'YOUR_WC_CONSUMER_SECRET', currency: 'CZK', rate: 0.041 },
-    PL: { url: 'https://noriks.com/pl/wp-json/wc/v3', key: 'YOUR_WC_CONSUMER_KEY', secret: 'YOUR_WC_CONSUMER_SECRET', currency: 'PLN', rate: 0.232 },
-    GR: { url: 'https://noriks.com/gr/wp-json/wc/v3', key: 'YOUR_WC_CONSUMER_KEY', secret: 'YOUR_WC_CONSUMER_SECRET', currency: 'EUR', rate: 1 },
-    IT: { url: 'https://noriks.com/it/wp-json/wc/v3', key: 'YOUR_WC_CONSUMER_KEY', secret: 'YOUR_WC_CONSUMER_SECRET', currency: 'EUR', rate: 1 },
-    HU: { url: 'https://noriks.com/hu/wp-json/wc/v3', key: 'YOUR_WC_CONSUMER_KEY', secret: 'YOUR_WC_CONSUMER_SECRET', currency: 'HUF', rate: 0.00256 },
-    SK: { url: 'https://noriks.com/sk/wp-json/wc/v3', key: 'YOUR_WC_CONSUMER_KEY', secret: 'YOUR_WC_CONSUMER_SECRET', currency: 'EUR', rate: 1 }
+    HR: { url: 'https://hr.shopdbestshop.eu/wp-json/wc/v3', key: 'ck_44df26f997ba97a163d3d194fb595550510bd36d', secret: 'cs_a848394041c4cdb0bc6e20803dda3864d0450adf', currency: 'EUR', rate: 1 },
+    CZ: { url: 'https://cz.shopdbestshop.eu/wp-json/wc/v3', key: 'ck_457cd6c863af7d67d7c0bd30b96a2a2a7f639b4d', secret: 'cs_75f62777bbc6b041dd8c8f8d8781bcc929f952f8', currency: 'CZK', rate: 0.041 },
+    PL: { url: 'https://pl.shopdbestshop.eu/wp-json/wc/v3', key: 'ck_095b14dce8d13379bd4c464aed2ca7d204853b31', secret: 'cs_f72ffbf1d7f7c20a8b9fd3d490ede5cdc21e234a', currency: 'PLN', rate: 0.232 },
+    HU: { url: 'https://hu.shopdbestshop.eu/wp-json/wc/v3', key: 'ck_19fc252ae26001b8f0c6c0da4e36187b2e9dbb20', secret: 'cs_c8eb8c74f6bb1a4b2d0ce79044daf62d2d91106e', currency: 'HUF', rate: 0.00256 },
+    SK: { url: 'https://sk.shopdbestshop.eu/wp-json/wc/v3', key: 'ck_b6fbddd1f340818b408e8ef011951b6cb906932f', secret: 'cs_d008c33f622b4066a29ff7fa67870f8a39057aaf', currency: 'EUR', rate: 1 }
 };
 
 const FB_TOKEN = 'YOUR_FACEBOOK_ACCESS_TOKEN';
-const FB_ACCOUNT = 'act_1922887421998222';
-const FB_ACCOUNTS = ['act_1922887421998222', 'act_1426869489183439']; // noriks + top_noriks_4
+const FB_ACCOUNT = 'act_1511515656522932'; // top_sdbshop_1 (kitajc)
+const FB_ACCOUNTS = ['act_1511515656522932']; // top_sdbshop_1 (kitajc)
 
 // Fetch insights from ALL FB ad accounts and merge results
 async function fetchAllAccountInsights(params) {
@@ -438,7 +437,7 @@ async function fetchAllAccountInsights(params) {
     return allData;
 }
 
-let dataCache = { dates: [], countries: ['HR', 'CZ', 'PL', 'GR', 'IT', 'HU', 'SK'], data: {}, lastUpdate: null, lastFullSync: null };
+let dataCache = { dates: [], countries: ['HR', 'CZ', 'PL', 'HU', 'SK'], data: {}, lastUpdate: null, lastFullSync: null };
 let inventoryUpdateQueue = Promise.resolve(); // Serializes inventory file writes
 
 function loadCache() {
@@ -607,13 +606,13 @@ function updateCustomerHistory(country, email, orderDate, orderTotal) {
 async function syncFullYear() {
     console.log('🔄 Starting FULL SYNC (2025 + 2026)...');
     const historyStart = '2025-01-01';
-    const dataStart = '2026-01-01';
+    const dataStart = STORE_START_DATE;
     const end = new Date().toISOString().split('T')[0];
     
     console.log(`Fetching orders from ${historyStart} to ${end}...`);
     
     // Fetch regular orders (for product details) and analytics orders (for customer_type)
-    const countries = ['HR', 'CZ', 'PL', 'GR', 'IT', 'HU', 'SK'];
+    const countries = ['HR', 'CZ', 'PL', 'HU', 'SK'];
     const orderPromises = countries.map(c => getWooOrders(c, historyStart, end));
     const analyticsPromises = countries.map(c => getWooAnalyticsOrders(c, historyStart, end));
     
@@ -1005,7 +1004,7 @@ async function syncFullYear() {
         const country = mkData.store;
         const date = mkData.date;
         if (!countries.includes(country)) continue;
-        if (date < '2026-01-01') continue;
+        if (date < STORE_START_DATE) continue;
         
         if (!newData[date]) newData[date] = {};
         if (!newData[date][country]) {
@@ -1117,7 +1116,7 @@ async function syncRecent(daysBack = 7) {
     const end = new Date().toISOString().split('T')[0];
     const start = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     
-    const countries = ['HR', 'CZ', 'PL', 'GR', 'IT', 'HU', 'SK'];
+    const countries = ['HR', 'CZ', 'PL', 'HU', 'SK'];
     
     // Fetch FB data in parallel (separate API)
     const fbData = await getFacebookAds(start, end);
@@ -1511,7 +1510,7 @@ async function syncRecent(daysBack = 7) {
 }
 
 function getCachedData(start, end) {
-    const result = { dates: [], countries: ['HR', 'CZ', 'PL', 'GR', 'IT', 'HU', 'SK'], data: {}, lastUpdate: dataCache.lastUpdate, lastFullSync: dataCache.lastFullSync };
+    const result = { dates: [], countries: ['HR', 'CZ', 'PL', 'HU', 'SK'], data: {}, lastUpdate: dataCache.lastUpdate, lastFullSync: dataCache.lastFullSync };
     if (!dataCache.dates || !Array.isArray(dataCache.dates)) return result;
     for (const date of dataCache.dates) {
         if (date >= start && date <= end && dataCache.data[date]) {
@@ -1689,7 +1688,7 @@ const server = http.createServer(async (req, res) => {
         const role = session.role || 'admin';
         const advertiserPages = ['/advertiser.html', '/origin.html'];
         const advertiserAPIs = ['/api/advertiser-data', '/api/origin-data'];
-        const warehousePages = ['/stock-report.html', '/stock-arrivals.html', '/purchasing.html', '/rejection-report.html', '/rejections.html', '/live-events.html', '/shipping-speed.html', '/skus.html', '/shipping.html'];
+        const warehousePages = ['/stock-report.html', '/stock-arrivals.html', '/purchasing.html', '/stock.html', '/rejection-report.html', '/rejections.html', '/live-events.html', '/shipping-speed.html', '/skus.html', '/shipping.html'];
         const warehouseAPIs = ['/api/stock', '/api/stock-arrivals', '/api/purchasing', '/api/rejections', '/api/rejection-report', '/api/shipping-speed', '/api/shipping-costs', '/api/skus', '/api/live-events', '/api/live-events/resolve', '/api/in-transit-orders', '/api/live-events/refresh', '/api/hr-tracking', '/api/expedico-tracking', '/api/local-tracking', '/api/cs-notes'];
 
         if (role === 'advertiser') {
@@ -1887,9 +1886,9 @@ const server = http.createServer(async (req, res) => {
         if (!session) { res.statusCode = 401; res.end(JSON.stringify({ error: 'Unauthorized' })); return; }
         res.setHeader('Content-Type', 'application/json');
         
-        const start = parsed.query.start || '2026-01-01';
+        const start = parsed.query.start || STORE_START_DATE;
         const end = parsed.query.end || new Date().toISOString().split('T')[0];
-        const countries = ['HR', 'CZ', 'PL', 'GR', 'IT', 'HU', 'SK'];
+        const countries = ['HR', 'CZ', 'PL', 'HU', 'SK'];
         
         // Serve from cache
         const dailyFiltered = {};
@@ -1979,7 +1978,7 @@ const server = http.createServer(async (req, res) => {
             const start = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
             const end = new Date().toISOString().split('T')[0];
             
-            const allCountries = ['HR', 'CZ', 'PL', 'GR', 'IT', 'HU', 'SK'];
+            const allCountries = ['HR', 'CZ', 'PL', 'HU', 'SK'];
             Promise.all(allCountries.map(c => getWooOrders(c, start, end))).then((ordersArrays) => {
                 const products = {};
                 const allOrders = filterTestOrders(ordersArrays.flat().filter(Boolean));
@@ -2509,7 +2508,7 @@ const server = http.createServer(async (req, res) => {
             return await fetchAllAccountInsights(params);
         }
         
-        const allCountries = ['HR', 'CZ', 'PL', 'GR', 'IT', 'HU', 'SK'];
+        const allCountries = ['HR', 'CZ', 'PL', 'HU', 'SK'];
         
         // Extend Meta campaign data 7 days back for spend comparison
         const compStart = new Date(new Date(start).getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -2988,12 +2987,12 @@ const server = http.createServer(async (req, res) => {
         if (!session) { res.statusCode = 401; res.end(JSON.stringify({ error: 'Unauthorized' })); return; }
         res.setHeader('Content-Type', 'application/json');
         
-        const countries = ['HR', 'CZ', 'PL', 'GR', 'IT', 'HU', 'SK'];
+        const countries = ['HR', 'CZ', 'PL', 'HU', 'SK'];
         const UNIT_PRICE = { tshirt: 3.50, boxers: 3.50, socks: 3.50 };
         const rows = [];
         
         for (const date of (dataCache.dates || []).sort().reverse()) {
-            if (date < '2026-01-01') continue;
+            if (date < STORE_START_DATE) continue;
             let totalTshirts = 0, totalBoxers = 0, totalSocks = 0, totalRevenue = 0;
             
             let totalOrders = 0;
@@ -3226,7 +3225,7 @@ const server = http.createServer(async (req, res) => {
         res.setHeader('Access-Control-Allow-Origin', '*');
         
         const today = new Date().toISOString().split('T')[0];
-        const yearStart = '2026-01-01';
+        const yearStart = STORE_START_DATE;
         const start = parsed.query.start || yearStart;
         const end = parsed.query.end || today;
         
@@ -3976,7 +3975,7 @@ function saveFbCrCache() {
 }
 
 async function syncFbCrData(start, end) {
-    const countries = ['HR', 'CZ', 'PL', 'GR', 'IT', 'HU', 'SK'];
+    const countries = ['HR', 'CZ', 'PL', 'HU', 'SK'];
     console.log(`[FB-CR] Syncing ${start} → ${end}...`);
     
     const params = new URLSearchParams({
@@ -4034,7 +4033,7 @@ async function syncFbCrData(start, end) {
 }
 
 async function syncFbCrFull() {
-    await syncFbCrData('2026-01-01', new Date().toISOString().split('T')[0]);
+    await syncFbCrData(STORE_START_DATE, new Date().toISOString().split('T')[0]);
     fbCrCache.lastFullSync = new Date().toISOString();
     saveFbCrCache();
 }

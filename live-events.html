@@ -155,7 +155,7 @@
         const FLAGS = { HR: '🇭🇷', CZ: '🇨🇿', PL: '🇵🇱', GR: '🇬🇷', SK: '🇸🇰', IT: '🇮🇹', HU: '🇭🇺' };
         const COUNTRY_NAMES = { HR: 'Hrvaška', CZ: 'Češka', PL: 'Poljska', GR: 'Grčija', SK: 'Slovaška', IT: 'Italija', HU: 'Madžarska' };
         const DAY_NAMES = ['NED', 'PON', 'TOR', 'SRE', 'ČET', 'PET', 'SOB'];
-        const COUNTRY_ORDER = ['HR', 'CZ', 'PL', 'GR', 'SK', 'IT', 'HU'];
+        const COUNTRY_ORDER = ['HR', 'CZ', 'PL', 'HU', 'SK'];
         
         let rejectionData = null;
         let currentCountry = null;
@@ -316,7 +316,7 @@
             const s = status.trim();
             return EVENT_LABELS[s] || s.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         }
-        const EXPEDICO_COUNTRIES = ['GR','SK','CZ','IT','PL'];
+        const EXPEDICO_COUNTRIES = ['SK','CZ','PL'];
         const DIRECT_CARRIER_COUNTRIES = ['HR','HU']; // These go direct to local carrier API, no Expedico
         const LOCAL_TRACKING_URLS = {
             CZ: code => 'https://www.postaonline.cz/en/trackandtrace/-/zasilka/cislo?parcelNumbers=' + encodeURIComponent(code),
@@ -412,7 +412,7 @@
                     
                     // Try local carrier scraping with localCode
                     let localEvents = [], localLocation = null, localCarrier = expCarrier;
-                    if (localCode && ['CZ','GR','SK','HU','PL'].includes(c)) {
+                    if (localCode && ['CZ','SK','HU','PL'].includes(c)) {
                         try {
                             const localRes = await fetch('/dashboard/api/local-tracking?code=' + encodeURIComponent(localCode) + '&country=' + c);
                             if (localRes.ok) {

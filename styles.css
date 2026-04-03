@@ -6,8 +6,8 @@
 :root {
     /* SIDEBAR - EXACT SPECS FROM FIRMA */
     --sidebar-width: 240px;
-    --sidebar-bg: #1E3A5F;
-    --sidebar-active-bg: #2D4A7A;
+    --sidebar-bg: #1A3A2A;
+    --sidebar-active-bg: #2D5A3A;
     --sidebar-text: rgba(255, 255, 255, 0.7);
     --sidebar-text-active: #FFFFFF;
     

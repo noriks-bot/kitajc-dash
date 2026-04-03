@@ -37,59 +37,17 @@ async function renderSidebar(activePage) {
             <a href="/dashboard/advertiser.html" class="nav-item ${activePage === 'advertiser' ? 'active' : ''}">
                 <span class="nav-icon">📢</span><span>Advertiser View</span>
             </a>
-            <a href="/dashboard/landings.html" class="nav-item ${activePage === 'landings' ? 'active' : ''}">
-                <span class="nav-icon">🛬</span><span>Landings</span>
-            </a>`;
-        if (role === 'admin') {
-            advSection += `
-            <a href="/dashboard/origin.html" class="nav-item ${activePage === 'origin' ? 'active' : ''}">
-                <span class="nav-icon">📍</span><span>Origin Report</span>
-            </a>
-            <a href="/dashboard/upsell-report.html" class="nav-item ${activePage === 'upsell-report' ? 'active' : ''}">
-                <span class="nav-icon">🎯</span><span>Upsell Report</span>
-            </a>
-            <a href="/dashboard/fb-cr.html" class="nav-item ${activePage === 'fb-cr' ? 'active' : ''}">
-                <span class="nav-icon">📈</span><span>FB CR Report</span>
-            </a>
-            <a href="/dashboard/payment-report.html" class="nav-item ${activePage === 'payment-report' ? 'active' : ''}">
-                <span class="nav-icon">💳</span><span>Payment Report</span>
-            </a>`;
-        }
+`;
         advSection += `</div>`;
         sections.push(advSection);
-    }
-
-    // ACQ / RET — admin only
-    if (role === 'admin') {
-        sections.push(`<div class="nav-section">
-            <div class="nav-section-title">ACQ Reports</div>
-            <a href="/dashboard/acq.html" class="nav-item ${activePage === 'acq' ? 'active' : ''}">
-                <span class="nav-icon">🆕</span><span>ACQ (All)</span>
-            </a>
-        </div>`);
-        sections.push(`<div class="nav-section">
-            <div class="nav-section-title">RET Reports</div>
-            <a href="/dashboard/ret.html" class="nav-item ${activePage === 'ret' ? 'active' : ''}">
-                <span class="nav-icon">🔄</span><span>RET (All)</span>
-            </a>
-        </div>`);
     }
 
     // Stock — admin + warehouse
     if (role === 'admin' || role === 'warehouse') {
         sections.push(`<div class="nav-section">
             <div class="nav-section-title">Stock</div>
-            <a href="/dashboard/stock-report.html" class="nav-item ${activePage === 'stock-report' ? 'active' : ''}">
-                <span class="nav-icon">📦</span><span>Stock Report</span>
-            </a>
-            <a href="/dashboard/stock-arrivals.html" class="nav-item ${activePage === 'stock-arrivals' ? 'active' : ''}">
-                <span class="nav-icon">🚚</span><span>Incoming Stock</span>
-            </a>
-            <a href="/dashboard/purchasing.html" class="nav-item ${activePage === 'purchasing' ? 'active' : ''}">
-                <span class="nav-icon">🛒</span><span>Purchasing</span>
-            </a>
-            <a href="/dashboard/stock-sales.html" class="nav-item ${activePage === 'stock-sales' ? 'active' : ''}">
-                <span class="nav-icon">💰</span><span>Stock Sales</span>
+            <a href="/dashboard/stock.html" class="nav-item ${activePage === 'stock' ? 'active' : ''}">
+                <span class="nav-icon">📦</span><span>Stock</span>
             </a>
         </div>`);
     }
@@ -111,9 +69,7 @@ async function renderSidebar(activePage) {
     // Settings — admin only (includes Users)
     const settingsItems = [];
     if (role === 'admin') {
-        settingsItems.push(`<a href="/dashboard/skus.html" class="nav-item ${activePage === 'skus' ? 'active' : ''}">
-            <span class="nav-icon">📦</span><span>SKU Settings</span>
-        </a>`);
+
         settingsItems.push(`<a href="/dashboard/shipping.html" class="nav-item ${activePage === 'shipping' ? 'active' : ''}">
             <span class="nav-icon">🚚</span><span>Shipping Costs</span>
         </a>`);
@@ -135,7 +91,7 @@ async function renderSidebar(activePage) {
             <div class="sidebar-brand">
                 <div class="sidebar-logo">N</div>
                 <div>
-                    <div class="sidebar-title">Noriks</div>
+                    <div class="sidebar-title">Noriks Kitajc</div>
                     <div class="sidebar-subtitle">Analytics Platform</div>
                 </div>
             </div>
