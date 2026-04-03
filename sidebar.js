@@ -30,17 +30,7 @@ async function renderSidebar(activePage) {
             </a>
         </div>`);
     }
-    // Advertiser — admin + advertiser (advertiser sees ONLY advertiser view, NOT origin)
-    if (role === 'admin' || role === 'advertiser') {
-        let advSection = `<div class="nav-section">
-            <div class="nav-section-title">Advertiser</div>
-            <a href="/dashboard/advertiser.html" class="nav-item ${activePage === 'advertiser' ? 'active' : ''}">
-                <span class="nav-icon">📢</span><span>Advertiser View</span>
-            </a>
-`;
-        advSection += `</div>`;
-        sections.push(advSection);
-    }
+
 
     // Stock — admin + warehouse
     if (role === 'admin' || role === 'warehouse') {
