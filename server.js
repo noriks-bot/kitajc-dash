@@ -1745,7 +1745,7 @@ const server = http.createServer(async (req, res) => {
                 const sku = (item.sku || '').toUpperCase().trim();
                 const soldAll = salesAll[sku] || 0;
                 const soldToday = salesToday[sku] || 0;
-                const remaining = Math.max(0, (item.initial_quantity || 0) - soldAll);
+                const remaining = (item.initial_quantity || 0) - soldAll;
                 return { ...item, sold_all: soldAll, sold_today: soldToday, quantity: remaining };
             });
             res.end(JSON.stringify(result));
@@ -4609,7 +4609,7 @@ server.listen(PORT, '0.0.0.0', async () => {
                 for (const item of items) {
                     const sku = (item.sku || '').toUpperCase();
                     const sold = r.salesAll[sku] || 0;
-                    const remaining = Math.max(0, (item.initial_quantity || 0) - sold);
+                    const remaining = (item.initial_quantity || 0) - sold;
                     if (remaining <= 50 && remaining > 0) {
                         console.warn(`[KITAJC-STOCK] ⚠️ LOW STOCK: ${item.name} (${sku}) — samo ${remaining} kos ostane!`);
                     } else if (remaining === 0) {
