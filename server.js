@@ -4567,4 +4567,13 @@ server.listen(PORT, '0.0.0.0', async () => {
         generateLiveEvents().catch(e => console.error('[LIVE-EVENTS] Auto-refresh failed:', e.message));
     }, 2 * 60 * 1000);
     console.log('[LIVE-EVENTS] Auto-refresh every 2 minutes');
+
+    // Kitajc stock sales — refresh every hour
+    setInterval(() => {
+        _kitajcSalesCache = null; // invalidate cache
+        getKitajcSkuSales()
+            .then(r => console.log('[KITAJC-STOCK] Hourly refresh done. Today:', JSON.stringify(r.salesToday)))
+            .catch(e => console.error('[KITAJC-STOCK] Hourly refresh failed:', e.message));
+    }, 60 * 60 * 1000);
+    console.log('[KITAJC-STOCK] Hourly sales refresh scheduled');
 });
