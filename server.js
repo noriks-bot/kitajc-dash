@@ -1620,6 +1620,103 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // ===== KITAJC STOCK API =====
+    const KITAJC_STOCK_FILE = path.join(__dirname, 'kitajc-stock.json');
+    // Initialize with default data if file doesn't exist
+    if (!fs.existsSync(KITAJC_STOCK_FILE)) {
+        const defaultStock = [
+            { name: 'nekitig',   sku: 'NEKITIG',  purchase_price: 4.69, initial_quantity: 3912 },
+            { name: 'elemas',    sku: 'ELEMAS',   purchase_price: 6.85, initial_quantity: 1008 },
+            { name: 'secug',     sku: 'SECUG',    purchase_price: 3.36, initial_quantity: 828  },
+            { name: 'felifun',   sku: 'FELIFUN',  purchase_price: 4.00, initial_quantity: 600  },
+            { name: 'frypan',    sku: 'FRYPAN',   purchase_price: 2.73, initial_quantity: 2016 },
+            { name: 'prskalica', sku: 'PRSKALICA',purchase_price: 3.02, initial_quantity: 2040 },
+            { name: 'defrost',   sku: 'DEFROST',  purchase_price: 3.00, initial_quantity: 1000 },
+        ];
+        fs.writeFileSync(KITAJC_STOCK_FILE, JSON.stringify(defaultStock, null, 2));
+    }
+
+    function loadKitajcStock() {
+        try { return JSON.parse(fs.readFileSync(KITAJC_STOCK_FILE, 'utf8')); } catch(e) { return []; }
+    }
+    function saveKitajcStock(data) {
+        fs.writeFileSync(KITAJC_STOCK_FILE, JSON.stringify(data, null, 2));
+    }
+
+    // GET /api/kitajc-stock — returns stock with live sales from WC
+    if (pathname === '/api/kitajc-stock' && req.method === 'GET') {
+        if (!getSession(req)) { res.statusCode = 401; res.end(JSON.stringify({ error: 'Unauthorized' })); return; }
+        res.setHeader('Content-Type', 'application/json');
+        const items = loadKitajcStock();
+        const today = new Date().toISOString().split('T')[0];
+
+        // Fetch SKU sales from all WC stores since STORE_START_DATE
+        const salesBySkuAll = {};
+        const salesBySkuToday = {};
+
+        const wcStores = [
+            { name: 'HR', url: 'https://hr.shopdbestshop.eu', ck: 'ck_44df26f997ba97a163d3d194fb595550510bd36d', cs: 'cs_a848394041c4cdb0bc6e20803dda3864d0450adf' },
+            { name: 'CZ', url: 'https://cz.shopdbestshop.eu', ck: 'ck_457cd6c863af7d67d7c0bd30b96a2a2a7f639b4d', cs: 'cs_75f62777bbc6b041dd8c8f8d8781bcc929f952f8' },
+            { name: 'PL', url: 'https://pl.shopdbestshop.eu', ck: 'ck_095b14dce8d13379bd4c464aed2ca7d204853b31', cs: 'cs_f72ffbf1d7f7c20a8b9fd3d490ede5cdc21e234a' },
+            { name: 'HU', url: 'https://hu.shopdbestshop.eu', ck: 'ck_19fc252ae26001b8f0c6c0da4e36187b2e9dbb20', cs: 'cs_c8eb8c74f6bb1a4b2d0ce79044daf62d2d91106e' },
+            { name: 'SK', url: 'https://sk.shopdbestshop.eu', ck: 'ck_b6fbddd1f340818b408e8ef011951b6cb906932f', cs: 'cs_d008c33f622b4066a29ff7fa67870f8a39057aaf' }
+        ];
+
+        async function fetchSkuSales(store) {
+            const auth = Buffer.from(`${store.ck}:${store.cs}`).toString('base64');
+            let page = 1, done = false;
+            while (!done) {
+                const url = `${store.url}/wp-json/wc/v3/orders?status=processing,completed&after=${STORE_START_DATE}T00:00:00&per_page=100&page=${page}`;
+                try {
+                    const resp = await fetch(url, { headers: { Authorization: `Basic ${auth}` }, signal: AbortSignal.timeout(15000) });
+                    const orders = await resp.json();
+                    if (!Array.isArray(orders) || orders.length === 0) break;
+                    for (const order of orders) {
+                        const orderDate = (order.date_created || '').slice(0, 10);
+                        for (const item of (order.line_items || [])) {
+                            const sku = (item.sku || '').toUpperCase().trim();
+                            if (!sku) continue;
+                            const qty = item.quantity || 1;
+                            salesBySkuAll[sku] = (salesBySkuAll[sku] || 0) + qty;
+                            if (orderDate === today) salesBySkuToday[sku] = (salesBySkuToday[sku] || 0) + qty;
+                        }
+                    }
+                    if (orders.length < 100) done = true;
+                    else page++;
+                } catch(e) { break; }
+            }
+        }
+
+        try { await Promise.all(wcStores.map(s => fetchSkuSales(s))); } catch(e) {}
+
+        const result = items.map(item => {
+            const sku = (item.sku || '').toUpperCase().trim();
+            const soldAll = salesBySkuAll[sku] || 0;
+            const soldToday = salesBySkuToday[sku] || 0;
+            const remaining = Math.max(0, (item.initial_quantity || 0) - soldAll);
+            return { ...item, sold_all: soldAll, sold_today: soldToday, quantity: remaining };
+        });
+
+        res.end(JSON.stringify(result));
+        return;
+    }
+
+    // POST /api/kitajc-stock — save stock items
+    if (pathname === '/api/kitajc-stock' && req.method === 'POST') {
+        if (!getSession(req)) { res.statusCode = 401; res.end(JSON.stringify({ error: 'Unauthorized' })); return; }
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+            try {
+                const data = JSON.parse(body);
+                saveKitajcStock(data);
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ ok: true }));
+            } catch(e) { res.statusCode = 400; res.end(JSON.stringify({ error: 'Invalid JSON' })); }
+        });
+        return;
+    }
+
     // Logout endpoint
     if (pathname === '/api/logout') {
         destroySession(req);
