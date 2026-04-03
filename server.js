@@ -99,6 +99,89 @@ function saveAdvertiserCache() { try { fs.writeFileSync(ADVERTISER_CACHE_FILE, J
 const STOCK_DATA_FILE = path.join(__dirname, 'stock-data.json');
 const MK_ORDER_MAP_FILE = path.join(__dirname, 'mk-order-map.json');
 
+// ===== KITAJC STOCK =====
+const KITAJC_STOCK_FILE = path.join(__dirname, 'kitajc-stock.json');
+function loadKitajcStock() {
+    try { return JSON.parse(fs.readFileSync(KITAJC_STOCK_FILE, 'utf8')); } catch(e) { return []; }
+}
+function saveKitajcStock(data) {
+    fs.writeFileSync(KITAJC_STOCK_FILE, JSON.stringify(data, null, 2));
+}
+// Init default stock if file missing
+if (!fs.existsSync(KITAJC_STOCK_FILE)) {
+    saveKitajcStock([
+        { name: 'nekitig',   sku: 'NEKITIG',   purchase_price: 4.69, initial_quantity: 3912 },
+        { name: 'elemas',    sku: 'ELEMAS',    purchase_price: 6.85, initial_quantity: 1008 },
+        { name: 'secug',     sku: 'SECUG',     purchase_price: 3.36, initial_quantity: 828  },
+        { name: 'felifun',   sku: 'FELIFUN',   purchase_price: 4.00, initial_quantity: 600  },
+        { name: 'frypan',    sku: 'FRYPAN',    purchase_price: 2.73, initial_quantity: 2016 },
+        { name: 'prskalica', sku: 'PRSKALICA', purchase_price: 3.02, initial_quantity: 2040 },
+        { name: 'defrost',   sku: 'DEFROST',   purchase_price: 3.00, initial_quantity: 1000 },
+    ]);
+}
+const KITAJC_WC_STORES = [
+    { name: 'HR', url: 'https://hr.shopdbestshop.eu', ck: 'ck_44df26f997ba97a163d3d194fb595550510bd36d', cs: 'cs_a848394041c4cdb0bc6e20803dda3864d0450adf' },
+    { name: 'CZ', url: 'https://cz.shopdbestshop.eu', ck: 'ck_457cd6c863af7d67d7c0bd30b96a2a2a7f639b4d', cs: 'cs_75f62777bbc6b041dd8c8f8d8781bcc929f952f8' },
+    { name: 'PL', url: 'https://pl.shopdbestshop.eu', ck: 'ck_095b14dce8d13379bd4c464aed2ca7d204853b31', cs: 'cs_f72ffbf1d7f7c20a8b9fd3d490ede5cdc21e234a' },
+    { name: 'HU', url: 'https://hu.shopdbestshop.eu', ck: 'ck_19fc252ae26001b8f0c6c0da4e36187b2e9dbb20', cs: 'cs_c8eb8c74f6bb1a4b2d0ce79044daf62d2d91106e' },
+    { name: 'SK', url: 'https://sk.shopdbestshop.eu', ck: 'ck_b6fbddd1f340818b408e8ef011951b6cb906932f', cs: 'cs_d008c33f622b4066a29ff7fa67870f8a39057aaf' }
+];
+// In-memory cache for stock sales (refreshed every 5 min)
+let _kitajcSalesCache = null;
+let _kitajcSalesCacheTime = 0;
+async function getKitajcSkuSales() {
+    const now = Date.now();
+    if (_kitajcSalesCache && (now - _kitajcSalesCacheTime) < 5 * 60 * 1000) {
+        return _kitajcSalesCache;
+    }
+    const result = await fetchKitajcSkuSales();
+    _kitajcSalesCache = result;
+    _kitajcSalesCacheTime = now;
+    console.log('[KITAJC-STOCK] Sales refreshed:', JSON.stringify(result.salesToday));
+    return result;
+}
+
+async function fetchKitajcSkuSales() {
+    const salesAll = {}, salesToday = {};
+    const today = new Date().toISOString().split('T')[0];
+    function wcGet(store, page) {
+        return new Promise((resolve) => {
+            const auth = Buffer.from(`${store.ck}:${store.cs}`).toString('base64');
+            const urlStr = `${store.url}/wp-json/wc/v3/orders?status=processing,completed&after=${STORE_START_DATE}T00:00:00&per_page=100&page=${page}`;
+            const parsed = new URL(urlStr);
+            const opts = { hostname: parsed.hostname, path: parsed.pathname + parsed.search, headers: { Authorization: `Basic ${auth}` }, timeout: 20000 };
+            const req = https.get(opts, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { resolve([]); } });
+            });
+            req.on('error', () => resolve([]));
+            req.on('timeout', () => { req.destroy(); resolve([]); });
+        });
+    }
+    for (const store of KITAJC_WC_STORES) {
+        let page = 1;
+        while (true) {
+            const orders = await wcGet(store, page);
+            if (!Array.isArray(orders) || orders.length === 0) break;
+            for (const order of orders) {
+                const d = (order.date_created || '').slice(0, 10);
+                for (const item of (order.line_items || [])) {
+                    const sku = (item.sku || '').toUpperCase().trim();
+                    if (!sku) continue;
+                    const qty = item.quantity || 1;
+                    salesAll[sku] = (salesAll[sku] || 0) + qty;
+                    if (d === today) salesToday[sku] = (salesToday[sku] || 0) + qty;
+                }
+            }
+            if (orders.length < 100) break;
+            page++;
+        }
+    }
+    console.log('[KITAJC-STOCK] Fetched salesAll:', JSON.stringify(salesAll), 'today:', JSON.stringify(salesToday));
+    return { salesAll, salesToday };
+}
+
 // Load product counts from stock-data.json (single source of truth)
 // Returns { today: {tshirts, boxers}, yesterday: {tshirts, boxers}, week: {tshirts, boxers} }
 function loadStockProductCounts() {
@@ -1620,84 +1703,26 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
-    // ===== KITAJC STOCK API =====
-    const KITAJC_STOCK_FILE = path.join(__dirname, 'kitajc-stock.json');
-    // Initialize with default data if file doesn't exist
-    if (!fs.existsSync(KITAJC_STOCK_FILE)) {
-        const defaultStock = [
-            { name: 'nekitig',   sku: 'NEKITIG',  purchase_price: 4.69, initial_quantity: 3912 },
-            { name: 'elemas',    sku: 'ELEMAS',   purchase_price: 6.85, initial_quantity: 1008 },
-            { name: 'secug',     sku: 'SECUG',    purchase_price: 3.36, initial_quantity: 828  },
-            { name: 'felifun',   sku: 'FELIFUN',  purchase_price: 4.00, initial_quantity: 600  },
-            { name: 'frypan',    sku: 'FRYPAN',   purchase_price: 2.73, initial_quantity: 2016 },
-            { name: 'prskalica', sku: 'PRSKALICA',purchase_price: 3.02, initial_quantity: 2040 },
-            { name: 'defrost',   sku: 'DEFROST',  purchase_price: 3.00, initial_quantity: 1000 },
-        ];
-        fs.writeFileSync(KITAJC_STOCK_FILE, JSON.stringify(defaultStock, null, 2));
-    }
-
-    function loadKitajcStock() {
-        try { return JSON.parse(fs.readFileSync(KITAJC_STOCK_FILE, 'utf8')); } catch(e) { return []; }
-    }
-    function saveKitajcStock(data) {
-        fs.writeFileSync(KITAJC_STOCK_FILE, JSON.stringify(data, null, 2));
-    }
-
     // GET /api/kitajc-stock — returns stock with live sales from WC
     if (pathname === '/api/kitajc-stock' && req.method === 'GET') {
         if (!getSession(req)) { res.statusCode = 401; res.end(JSON.stringify({ error: 'Unauthorized' })); return; }
         res.setHeader('Content-Type', 'application/json');
         const items = loadKitajcStock();
-        const today = new Date().toISOString().split('T')[0];
-
-        // Fetch SKU sales from all WC stores since STORE_START_DATE
-        const salesBySkuAll = {};
-        const salesBySkuToday = {};
-
-        const wcStores = [
-            { name: 'HR', url: 'https://hr.shopdbestshop.eu', ck: 'ck_44df26f997ba97a163d3d194fb595550510bd36d', cs: 'cs_a848394041c4cdb0bc6e20803dda3864d0450adf' },
-            { name: 'CZ', url: 'https://cz.shopdbestshop.eu', ck: 'ck_457cd6c863af7d67d7c0bd30b96a2a2a7f639b4d', cs: 'cs_75f62777bbc6b041dd8c8f8d8781bcc929f952f8' },
-            { name: 'PL', url: 'https://pl.shopdbestshop.eu', ck: 'ck_095b14dce8d13379bd4c464aed2ca7d204853b31', cs: 'cs_f72ffbf1d7f7c20a8b9fd3d490ede5cdc21e234a' },
-            { name: 'HU', url: 'https://hu.shopdbestshop.eu', ck: 'ck_19fc252ae26001b8f0c6c0da4e36187b2e9dbb20', cs: 'cs_c8eb8c74f6bb1a4b2d0ce79044daf62d2d91106e' },
-            { name: 'SK', url: 'https://sk.shopdbestshop.eu', ck: 'ck_b6fbddd1f340818b408e8ef011951b6cb906932f', cs: 'cs_d008c33f622b4066a29ff7fa67870f8a39057aaf' }
-        ];
-
-        async function fetchSkuSales(store) {
-            const auth = Buffer.from(`${store.ck}:${store.cs}`).toString('base64');
-            let page = 1, done = false;
-            while (!done) {
-                const url = `${store.url}/wp-json/wc/v3/orders?status=processing,completed&after=${STORE_START_DATE}T00:00:00&per_page=100&page=${page}`;
-                try {
-                    const resp = await fetch(url, { headers: { Authorization: `Basic ${auth}` }, signal: AbortSignal.timeout(15000) });
-                    const orders = await resp.json();
-                    if (!Array.isArray(orders) || orders.length === 0) break;
-                    for (const order of orders) {
-                        const orderDate = (order.date_created || '').slice(0, 10);
-                        for (const item of (order.line_items || [])) {
-                            const sku = (item.sku || '').toUpperCase().trim();
-                            if (!sku) continue;
-                            const qty = item.quantity || 1;
-                            salesBySkuAll[sku] = (salesBySkuAll[sku] || 0) + qty;
-                            if (orderDate === today) salesBySkuToday[sku] = (salesBySkuToday[sku] || 0) + qty;
-                        }
-                    }
-                    if (orders.length < 100) done = true;
-                    else page++;
-                } catch(e) { break; }
-            }
+        try {
+            const { salesAll, salesToday } = await getKitajcSkuSales();
+            console.log('[KITAJC-STOCK] API salesAll:', JSON.stringify(salesAll), 'today:', JSON.stringify(salesToday));
+            const result = items.map(item => {
+                const sku = (item.sku || '').toUpperCase().trim();
+                const soldAll = salesAll[sku] || 0;
+                const soldToday = salesToday[sku] || 0;
+                const remaining = Math.max(0, (item.initial_quantity || 0) - soldAll);
+                return { ...item, sold_all: soldAll, sold_today: soldToday, quantity: remaining };
+            });
+            res.end(JSON.stringify(result));
+        } catch(e) {
+            console.error('[KITAJC-STOCK] Error:', e.message, e.stack);
+            res.end(JSON.stringify(items.map(i => ({ ...i, sold_all: 0, sold_today: 0 }))));
         }
-
-        try { await Promise.all(wcStores.map(s => fetchSkuSales(s))); } catch(e) {}
-
-        const result = items.map(item => {
-            const sku = (item.sku || '').toUpperCase().trim();
-            const soldAll = salesBySkuAll[sku] || 0;
-            const soldToday = salesBySkuToday[sku] || 0;
-            const remaining = Math.max(0, (item.initial_quantity || 0) - soldAll);
-            return { ...item, sold_all: soldAll, sold_today: soldToday, quantity: remaining };
-        });
-
-        res.end(JSON.stringify(result));
         return;
     }
 

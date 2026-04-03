@@ -8,45 +8,185 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         .stock-wrap { padding: 24px; }
-        .card {
+
+        /* Add form card */
+        .add-card {
             background: #fff;
             border-radius: 12px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-            padding: 24px;
-            margin-bottom: 24px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+            padding: 20px 24px;
+            margin-bottom: 20px;
+            border: 1px solid #e8f0e8;
         }
-        .card-title { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: #1a202c; }
-        .add-form { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
-        .form-group { display: flex; flex-direction: column; gap: 5px; }
-        .form-group label { font-size: 11px; font-weight: 600; color: #718096; text-transform: uppercase; letter-spacing: 0.5px; }
-        .form-group input { padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-family: inherit; color: #1a202c; outline: none; }
-        .form-group input:focus { border-color: #1A3A2A; }
-        .inp-name { width: 200px; }
-        .inp-price { width: 110px; }
-        .inp-qty { width: 90px; }
-        .inp-sku { width: 100px; }
-        .btn-add { padding: 9px 20px; background: #1A3A2A; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; height: 38px; }
+        .add-card-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #1A3A2A;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 14px;
+        }
+        .add-row {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .field label {
+            font-size: 10px;
+            font-weight: 700;
+            color: #8a9ab0;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+        }
+        .field input {
+            height: 36px;
+            padding: 0 11px;
+            border: 1px solid #dde3ea;
+            border-radius: 7px;
+            font-size: 13px;
+            font-family: inherit;
+            color: #1a202c;
+            background: #fafbfc;
+            outline: none;
+            transition: border-color 0.15s, background 0.15s;
+        }
+        .field input:focus { border-color: #1A3A2A; background: #fff; }
+        .field-name input { width: 190px; }
+        .field-sku input { width: 95px; text-transform: uppercase; }
+        .field-price input { width: 100px; }
+        .field-qty input { width: 85px; }
+        .btn-add {
+            height: 36px;
+            padding: 0 18px;
+            background: #1A3A2A;
+            color: #fff;
+            border: none;
+            border-radius: 7px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            letter-spacing: 0.2px;
+        }
         .btn-add:hover { background: #2D5A3A; }
-        .btn-refresh { padding: 9px 16px; background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; height: 38px; }
+
+        /* Table card */
+        .table-card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+            border: 1px solid #e8f0e8;
+            overflow: hidden;
+        }
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px 14px;
+            border-bottom: 1px solid #f0f4f0;
+        }
+        .table-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #1a202c;
+        }
+        .table-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .updated-at {
+            font-size: 11px;
+            color: #b0bec5;
+        }
+        .btn-refresh {
+            height: 30px;
+            padding: 0 12px;
+            background: #f0fdf4;
+            color: #1A3A2A;
+            border: 1px solid #bbf7d0;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+        }
         .btn-refresh:hover { background: #dcfce7; }
-        table { width: 100%; border-collapse: collapse; font-size: 14px; font-family: inherit; }
-        th { text-align: left; padding: 9px 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #718096; border-bottom: 2px solid #e2e8f0; }
-        td { padding: 11px 12px; border-bottom: 1px solid #f0f4f8; color: #1a202c; vertical-align: middle; }
-        tr:last-child td { border-bottom: none; }
-        tr:hover td { background: #f7fafc; }
-        .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
-        .badge-ok  { background: #dcfce7; color: #166534; }
-        .badge-low { background: #fef9c3; color: #854d0e; }
-        .badge-zero{ background: #fee2e2; color: #dc2626; }
-        .editable-price { cursor: pointer; border-bottom: 1px dashed #a0aec0; display: inline-block; }
-        .editable-price:hover { border-bottom-color: #1A3A2A; color: #1A3A2A; }
-        .price-input { width: 80px; padding: 3px 6px; border: 1px solid #1A3A2A; border-radius: 5px; font-size: 14px; font-family: inherit; }
-        .empty { text-align: center; padding: 36px; color: #a0aec0; font-size: 14px; }
-        .tfoot-row td { font-weight: 700; border-top: 2px solid #e2e8f0; background: #f7fafc; }
+        .btn-refresh.loading { opacity: 0.6; pointer-events: none; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        thead th {
+            padding: 9px 14px;
+            text-align: left;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: #8a9ab0;
+            background: #fafbfc;
+            border-bottom: 1px solid #edf0f2;
+            white-space: nowrap;
+        }
+        td {
+            padding: 11px 14px;
+            border-bottom: 1px solid #f5f7f5;
+            color: #1a202c;
+            vertical-align: middle;
+        }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover td { background: #f9fdf9; }
+
+        .sku-tag {
+            font-size: 11px;
+            font-weight: 600;
+            color: #1A3A2A;
+            background: #f0fdf4;
+            padding: 2px 7px;
+            border-radius: 4px;
+            border: 1px solid #bbf7d0;
+            font-family: monospace;
+            letter-spacing: 0.3px;
+        }
+        .editable {
+            cursor: pointer;
+            border-bottom: 1px dashed #c0ccd8;
+            display: inline-block;
+            transition: color 0.1s;
+        }
+        .editable:hover { color: #1A3A2A; border-bottom-color: #1A3A2A; }
+        .inline-input {
+            width: 80px; padding: 3px 7px;
+            border: 1px solid #1A3A2A; border-radius: 5px;
+            font-size: 13px; font-family: inherit;
+        }
+        .num { font-variant-numeric: tabular-nums; }
         .sold-today { font-weight: 700; color: #1A3A2A; }
-        .loading { color: #a0aec0; font-style: italic; }
-        .sku-tag { font-size: 11px; color: #718096; background: #f7fafc; padding: 1px 6px; border-radius: 4px; border: 1px solid #e2e8f0; }
-        .last-updated { font-size: 12px; color: #a0aec0; margin-bottom: 12px; }
+        .stock-remain { font-weight: 700; }
+
+        .badge {
+            display: inline-block; padding: 2px 8px;
+            border-radius: 20px; font-size: 10px; font-weight: 700; letter-spacing: 0.3px;
+        }
+        .badge-ok   { background: #dcfce7; color: #166534; }
+        .badge-low  { background: #fef9c3; color: #92400e; }
+        .badge-zero { background: #fee2e2; color: #dc2626; }
+
+        tfoot td {
+            padding: 10px 14px;
+            font-weight: 700;
+            font-size: 13px;
+            background: #f9fdf9;
+            border-top: 2px solid #e8f0e8;
+            color: #1a202c;
+        }
+        .empty { text-align: center; padding: 40px; color: #b0bec5; font-size: 13px; }
+        .loading-row { text-align: center; padding: 32px; color: #b0bec5; font-size: 13px; font-style: italic; }
     </style>
 </head>
 <body>
@@ -62,7 +202,7 @@
             </div>
             <div class="topbar-right">
                 <span id="username-display" style="font-size:13px;color:#718096;"></span>
-                <button onclick="doLogout()" style="margin-left:12px;padding:6px 14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;">Odjava</button>
+                <button onclick="doLogout()" style="margin-left:12px;padding:5px 13px;border:1px solid #e2e8f0;border-radius:7px;background:#fff;cursor:pointer;font-size:12px;font-family:inherit;">Odjava</button>
             </div>
         </header>
 
@@ -70,36 +210,36 @@
             <div class="stock-wrap">
 
                 <!-- Add form -->
-                <div class="card">
-                    <div class="card-title">Dodaj izdelek</div>
-                    <div class="add-form">
-                        <div class="form-group">
+                <div class="add-card">
+                    <div class="add-card-title">+ Dodaj izdelek</div>
+                    <div class="add-row">
+                        <div class="field field-name">
                             <label>Ime izdelka</label>
-                            <input class="inp-name" id="inp-name" type="text" placeholder="npr. Wok Tava">
+                            <input id="inp-name" type="text" placeholder="npr. Wok Tava 8v1">
                         </div>
-                        <div class="form-group">
+                        <div class="field field-sku">
                             <label>SKU</label>
-                            <input class="inp-sku" id="inp-sku" type="text" placeholder="npr. NEKITIG">
+                            <input id="inp-sku" type="text" placeholder="NEKITIG">
                         </div>
-                        <div class="form-group">
+                        <div class="field field-price">
                             <label>Nabavna cena (€)</label>
-                            <input class="inp-price" id="inp-price" type="number" placeholder="0.00" step="0.01" min="0">
+                            <input id="inp-price" type="number" placeholder="0.00" step="0.01" min="0">
                         </div>
-                        <div class="form-group">
+                        <div class="field field-qty">
                             <label>Začetna zaloga</label>
-                            <input class="inp-qty" id="inp-qty" type="number" placeholder="0" min="0">
+                            <input id="inp-qty" type="number" placeholder="0" min="0">
                         </div>
                         <button class="btn-add" onclick="addProduct()">+ Dodaj</button>
                     </div>
                 </div>
 
                 <!-- Table -->
-                <div class="card">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-                        <div class="card-title" style="margin-bottom:0;">Zaloga</div>
-                        <div style="display:flex;align-items:center;gap:12px;">
-                            <span class="last-updated" id="last-updated"></span>
-                            <button class="btn-refresh" onclick="loadData(true)">🔄 Osveži prodaje</button>
+                <div class="table-card">
+                    <div class="table-header">
+                        <div class="table-title">Zaloga izdelkov</div>
+                        <div class="table-meta">
+                            <span class="updated-at" id="updated-at"></span>
+                            <button class="btn-refresh" id="btn-refresh" onclick="loadData()">🔄 Osveži</button>
                         </div>
                     </div>
                     <table>
@@ -109,16 +249,18 @@
                                 <th>Ime izdelka</th>
                                 <th>SKU</th>
                                 <th>Nabavna cena</th>
-                                <th>Začetna zaloga</th>
+                                <th>Zač. zaloga</th>
                                 <th>Prodaje danes</th>
                                 <th>Prodaje skupaj</th>
-                                <th>Zaloga (ostalo)</th>
+                                <th>Zaloga ostalo</th>
                                 <th>Status</th>
                                 <th>Vrednost zalog</th>
                             </tr>
                         </thead>
-                        <tbody id="stock-tbody"><tr><td colspan="10" class="empty loading">Nalagam...</td></tr></tbody>
-                        <tfoot id="stock-tfoot"></tfoot>
+                        <tbody id="tbody">
+                            <tr><td colspan="10" class="loading-row">Nalagam...</td></tr>
+                        </tbody>
+                        <tfoot id="tfoot"></tfoot>
                     </table>
                 </div>
 
@@ -130,33 +272,19 @@
 <script src="/dashboard/sidebar.js"></script>
 <script>renderSidebar('stock');</script>
 <script>
-function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-function badge(qty) {
-    if (qty <= 0) return '<span class="badge badge-zero">Izčrpano</span>';
-    if (qty <= 10) return '<span class="badge badge-low">Malo</span>';
-    return '<span class="badge badge-ok">OK</span>';
-}
-
 let _items = [];
 
-async function loadData(showLoader) {
-    if (showLoader) {
-        document.getElementById('stock-tbody').innerHTML = '<tr><td colspan="10" class="empty loading">Nalagam prodaje iz WooCommerce...</td></tr>';
-    }
-    try {
-        const r = await fetch('/dashboard/api/kitajc-stock');
-        _items = await r.json();
-        render(_items);
-        document.getElementById('last-updated').textContent = 'Posodobljeno: ' + new Date().toLocaleTimeString('sl-SI');
-    } catch(e) {
-        document.getElementById('stock-tbody').innerHTML = '<tr><td colspan="10" class="empty">Napaka pri nalaganju.</td></tr>';
-    }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function badge(q) {
+    if (q <= 0) return '<span class="badge badge-zero">Izčrpano</span>';
+    if (q <= 10) return '<span class="badge badge-low">Malo</span>';
+    return '<span class="badge badge-ok">OK</span>';
 }
+function fmt(n) { return Number(n||0).toFixed(2); }
 
 function render(items) {
-    const tbody = document.getElementById('stock-tbody');
-    const tfoot = document.getElementById('stock-tfoot');
+    const tbody = document.getElementById('tbody');
+    const tfoot = document.getElementById('tfoot');
     if (!items.length) {
         tbody.innerHTML = '<tr><td colspan="10" class="empty">Ni še nobenih izdelkov.</td></tr>';
         tfoot.innerHTML = ''; return;
@@ -167,87 +295,93 @@ function render(items) {
         const val = (item.purchase_price || 0) * qty;
         totalVal += val;
         return `<tr>
-            <td>${i+1}</td>
-            <td>${esc(item.name)}</td>
+            <td style="color:#b0bec5;font-size:12px;">${i+1}</td>
+            <td style="font-weight:500;">${esc(item.name)}</td>
             <td><span class="sku-tag">${esc(item.sku||'—')}</span></td>
-            <td><span class="editable-price" onclick="editPrice(${i})" title="Klikni za urejanje">€ ${Number(item.purchase_price||0).toFixed(2)}</span></td>
-            <td>${item.initial_quantity||0}</td>
-            <td class="sold-today">${item.sold_today||0}</td>
-            <td>${item.sold_all||0}</td>
-            <td><strong>${qty}</strong></td>
+            <td><span class="editable num" onclick="editField(${i},'purchase_price')" title="Klikni za urejanje">€ ${fmt(item.purchase_price)}</span></td>
+            <td class="num">${item.initial_quantity||0}</td>
+            <td class="num sold-today">${item.sold_today||0}</td>
+            <td class="num">${item.sold_all||0}</td>
+            <td class="num stock-remain">${qty}</td>
             <td>${badge(qty)}</td>
-            <td>€ ${val.toFixed(2)}</td>
+            <td class="num">€ ${fmt(val)}</td>
         </tr>`;
     }).join('');
-    tfoot.innerHTML = `<tr class="tfoot-row">
-        <td colspan="8" style="text-align:right;padding-right:12px;">Skupna vrednost zalog:</td>
-        <td colspan="2">€ ${totalVal.toFixed(2)}</td>
+    tfoot.innerHTML = `<tr>
+        <td colspan="9" style="text-align:right;">Skupna vrednost zalog:</td>
+        <td class="num">€ ${fmt(totalVal)}</td>
     </tr>`;
 }
 
-async function saveItems(items) {
-    await fetch('/dashboard/api/kitajc-stock', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(items)
-    });
+async function loadData() {
+    const btn = document.getElementById('btn-refresh');
+    btn.classList.add('loading');
+    btn.textContent = '⏳ Nalagam...';
+    try {
+        const r = await fetch('/dashboard/api/kitajc-stock');
+        _items = await r.json();
+        render(_items);
+        document.getElementById('updated-at').textContent = 'Posodobljeno ' + new Date().toLocaleTimeString('sl-SI');
+    } catch(e) {
+        document.getElementById('tbody').innerHTML = '<tr><td colspan="10" class="empty">Napaka pri nalaganju.</td></tr>';
+    }
+    btn.classList.remove('loading');
+    btn.textContent = '🔄 Osveži';
 }
 
-function editPrice(i) {
-    const item = _items[i];
-    const cells = document.querySelectorAll('#stock-tbody tr')[i].querySelectorAll('td');
-    const cell = cells[3];
-    const cur = item.purchase_price || 0;
-    cell.innerHTML = `<input class="price-input" id="price-inp-${i}" type="number" value="${cur}" step="0.01" min="0">`;
-    const inp = document.getElementById(`price-inp-${i}`);
+async function save(items) {
+    const toSave = items.map(it => ({ name: it.name, sku: it.sku, purchase_price: it.purchase_price, initial_quantity: it.initial_quantity }));
+    await fetch('/dashboard/api/kitajc-stock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(toSave) });
+}
+
+function editField(i, field) {
+    const colIndex = field === 'purchase_price' ? 3 : 4;
+    const cell = document.querySelectorAll('#tbody tr')[i].querySelectorAll('td')[colIndex];
+    const cur = _items[i][field] || 0;
+    cell.innerHTML = `<input class="inline-input" id="ei-${i}" type="number" value="${cur}" step="${field==='purchase_price'?'0.01':'1'}" min="0">`;
+    const inp = document.getElementById(`ei-${i}`);
     inp.focus(); inp.select();
-    async function save() {
-        _items[i].purchase_price = parseFloat(inp.value) || 0;
-        const toSave = _items.map(it => ({ name: it.name, sku: it.sku, purchase_price: it.purchase_price, initial_quantity: it.initial_quantity }));
-        await saveItems(toSave);
-        await loadData(false);
+    async function commit() {
+        _items[i][field] = parseFloat(inp.value) || 0;
+        await save(_items);
+        await loadData();
     }
-    inp.addEventListener('blur', save);
-    inp.addEventListener('keydown', e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') loadData(false); });
+    inp.addEventListener('blur', commit);
+    inp.addEventListener('keydown', e => { if (e.key==='Enter') commit(); if (e.key==='Escape') render(_items); });
 }
 
 async function addProduct() {
-    const name = document.getElementById('inp-name').value.trim();
-    const sku  = document.getElementById('inp-sku').value.trim().toUpperCase();
+    const name  = document.getElementById('inp-name').value.trim();
+    const sku   = document.getElementById('inp-sku').value.trim().toUpperCase();
     const price = parseFloat(document.getElementById('inp-price').value) || 0;
     const qty   = parseInt(document.getElementById('inp-qty').value) || 0;
     if (!name) { alert('Vnesi ime izdelka'); return; }
     if (!sku)  { alert('Vnesi SKU'); return; }
-
-    // Load current saved items, add new one
     const r = await fetch('/dashboard/api/kitajc-stock');
     const current = await r.json();
     const toSave = current.map(it => ({ name: it.name, sku: it.sku, purchase_price: it.purchase_price, initial_quantity: it.initial_quantity }));
     toSave.push({ name, sku, purchase_price: price, initial_quantity: qty });
-    await saveItems(toSave);
-
-    document.getElementById('inp-name').value = '';
-    document.getElementById('inp-sku').value = '';
-    document.getElementById('inp-price').value = '';
-    document.getElementById('inp-qty').value = '';
-    await loadData(true);
+    await fetch('/dashboard/api/kitajc-stock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(toSave) });
+    ['inp-name','inp-sku','inp-price','inp-qty'].forEach(id => document.getElementById(id).value = '');
+    await loadData();
 }
 
 function doLogout() {
     fetch('/dashboard/api/logout', { method: 'POST' }).then(() => location.href = '/dashboard/login');
 }
 
-fetch('/dashboard/api/me').then(r => r.json()).then(d => {
+// SKU input force uppercase
+document.getElementById('inp-sku').addEventListener('input', function() { this.value = this.value.toUpperCase(); });
+
+fetch('/dashboard/api/me').then(r=>r.json()).then(d => {
     if (d.username) document.getElementById('username-display').textContent = d.username;
-}).catch(() => {});
+}).catch(()=>{});
 
 ['inp-name','inp-sku','inp-price','inp-qty'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') addProduct(); });
+    document.getElementById(id).addEventListener('keydown', e => { if (e.key==='Enter') addProduct(); });
 });
 
-// Load on start
-loadData(true);
+loadData();
 </script>
 </body>
 </html>
