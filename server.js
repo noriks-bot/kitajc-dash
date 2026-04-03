@@ -49,7 +49,7 @@ const CAMPAIGN_NAMES_FILE = path.join(__dirname, 'campaign-names.json');
 let campaignNames = {};
 try { if (fs.existsSync(CAMPAIGN_NAMES_FILE)) campaignNames = JSON.parse(fs.readFileSync(CAMPAIGN_NAMES_FILE, 'utf8')); } catch(e) {}
 
-async function resolveCampaignNames(campaignIds) {
+async function resolveCampaignNames(campaignIds) { return; // disabled - not needed for kitajc
     const unknown = campaignIds.filter(id => id && !campaignNames[id] && /^\d+$/.test(id));
     if (unknown.length === 0) return;
     console.log('[CAMPAIGNS] Resolving', unknown.length, 'campaign names...');
@@ -419,7 +419,7 @@ const config = {
     SK: { url: 'https://sk.shopdbestshop.eu/wp-json/wc/v3', key: 'ck_b6fbddd1f340818b408e8ef011951b6cb906932f', secret: 'cs_d008c33f622b4066a29ff7fa67870f8a39057aaf', currency: 'EUR', rate: 1 }
 };
 
-const FB_TOKEN = 'YOUR_FACEBOOK_ACCESS_TOKEN';
+const FB_TOKEN = 'EAAR1d7hDpEkBQxdtLk9xZBIPqpxFNV48ZA6FnqOumgzSSagyz3l720s5SI1Ev6YIWrZCTjLDxcEiPYwIxKfLmBr4AEoIf8SiusxRaSZAHX8DePLnFUajOSKI4ZAZA8sauiHEUVhsr2ZCIeZA8bhzak5qCZCfh0bVWm2ZAhZCJ8CYmbK0BNiTgHHgeKLD6pAWz5V';
 const FB_ACCOUNT = 'act_1511515656522932'; // top_sdbshop_1 (kitajc)
 const FB_ACCOUNTS = ['act_1511515656522932']; // top_sdbshop_1 (kitajc)
 
