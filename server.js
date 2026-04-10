@@ -135,6 +135,15 @@ const KITAJC_WC_STORES = [
 // In-memory cache for stock sales (refreshed every 5 min)
 let _kitajcSalesCache = null;
 let _kitajcSalesCacheTime = 0;
+
+// SKU aliases: sales of alias SKUs are merged into the canonical SKU
+const SKU_ALIASES = {
+    'ELSPREJ-1': 'ELSPREJ',
+};
+
+function resolveSkuAlias(sku) {
+    return SKU_ALIASES[sku] || sku;
+}
 async function getKitajcSkuSales() {
     const now = Date.now();
     if (_kitajcSalesCache && (now - _kitajcSalesCacheTime) < 5 * 60 * 1000) {
@@ -173,8 +182,9 @@ async function fetchKitajcSkuSales() {
             for (const order of orders) {
                 const d = (order.date_created || '').slice(0, 10);
                 for (const item of (order.line_items || [])) {
-                    const sku = (item.sku || '').toUpperCase().trim();
+                    let sku = (item.sku || '').toUpperCase().trim();
                     if (!sku) continue;
+                    sku = resolveSkuAlias(sku);
                     const qty = item.quantity || 1;
                     salesAll[sku] = (salesAll[sku] || 0) + qty;
                     if (d === today) salesToday[sku] = (salesToday[sku] || 0) + qty;
@@ -584,7 +594,7 @@ function filterTestOrders(orders) {
 async function getWooOrders(country, start, end, page = 1, allOrders = []) {
     const c = config[country];
     const auth = Buffer.from(`${c.key}:${c.secret}`).toString('base64');
-    const apiUrl = `${c.url}/orders?after=${start}T00:00:00&before=${end}T23:59:59&per_page=100&page=${page}&status=completed,processing`;
+    const apiUrl = `${c.url}/orders?after=${start}T00:00:00&before=${end}T23:59:59&per_page=100&page=${page}&status=any&consumer_key=${c.key}&consumer_secret=${c.secret}`;
     
     try {
         const result = await new Promise((resolve, reject) => {
@@ -618,7 +628,7 @@ async function getWooAnalyticsOrders(country, start, end, page = 1, allOrders = 
     const auth = Buffer.from(`${c.key}:${c.secret}`).toString('base64');
     // Analytics API uses different date format and endpoint
     const baseUrl = c.url.replace('/wp-json/wc/v3', '/wp-json/wc-analytics/reports/orders');
-    const apiUrl = `${baseUrl}?after=${start}T00:00:00&before=${end}T23:59:59&per_page=100&page=${page}&status=completed,processing`;
+    const apiUrl = `${baseUrl}?after=${start}T00:00:00&before=${end}T23:59:59&per_page=100&page=${page}&status=any&consumer_key=${c.key}&consumer_secret=${c.secret}`;
     
     try {
         const result = await new Promise((resolve, reject) => {
@@ -953,8 +963,8 @@ async function syncFullYear() {
                     byDate[date].tshirts += (product.tshirts || 0) * lineQty;
                     byDate[date].boxers += (product.boxers || 0) * lineQty;
                     byDate[date].socks += (product.socks || 0) * lineQty;
-                    // Add SKU-based cost
-                    const sku = (item.sku || '').toUpperCase().trim();
+                    // Add SKU-based cost (resolve aliases)
+                    const sku = resolveSkuAlias((item.sku || '').toUpperCase().trim());
                     const skuCost = skuCostMap[sku] || 0;
                     if (!byDate[date].sku_product_cost) byDate[date].sku_product_cost = 0;
                     byDate[date].sku_product_cost += skuCost * lineQty;
@@ -1413,8 +1423,8 @@ async function syncRecent(daysBack = 7) {
                     byDate[date].tshirts += (product.tshirts || 0) * lineQty;
                     byDate[date].boxers += (product.boxers || 0) * lineQty;
                     byDate[date].socks += (product.socks || 0) * lineQty;
-                    // SKU-based cost
-                    const sku2 = (item.sku || '').toUpperCase().trim();
+                    // SKU-based cost (resolve aliases)
+                    const sku2 = resolveSkuAlias((item.sku || '').toUpperCase().trim());
                     const skuCost2 = skuCostMap2[sku2] || 0;
                     if (!byDate[date].sku_product_cost) byDate[date].sku_product_cost = 0;
                     byDate[date].sku_product_cost += skuCost2 * lineQty;
@@ -1741,6 +1751,18 @@ const server = http.createServer(async (req, res) => {
         try {
             const { salesAll, salesToday } = await getKitajcSkuSales();
             console.log('[KITAJC-STOCK] API salesAll:', JSON.stringify(salesAll), 'today:', JSON.stringify(salesToday));
+            // Auto-add any sold SKU not yet in stock (qty 0, price 0)
+            const existingSkus = new Set(items.map(i => (i.sku || '').toUpperCase().trim()));
+            let stockChanged = false;
+            for (const sku of Object.keys(salesAll)) {
+                if (!existingSkus.has(sku)) {
+                    items.push({ name: sku, sku, purchase_price: 0, initial_quantity: 0 });
+                    existingSkus.add(sku);
+                    stockChanged = true;
+                    console.log('[KITAJC-STOCK] Auto-added missing SKU:', sku);
+                }
+            }
+            if (stockChanged) saveKitajcStock(items);
             const result = items.map(item => {
                 const sku = (item.sku || '').toUpperCase().trim();
                 const soldAll = salesAll[sku] || 0;
@@ -4593,9 +4615,9 @@ server.listen(PORT, '0.0.0.0', async () => {
         console.error('[LIVE-EVENTS] Initial generation failed:', e.message);
     }
     // Auto-refresh every 2 minutes
-    setInterval(() => {
-        generateLiveEvents().catch(e => console.error('[LIVE-EVENTS] Auto-refresh failed:', e.message));
-    }, 2 * 60 * 1000);
+//     setInterval(() => {
+//         generateLiveEvents().catch(e => console.error('[LIVE-EVENTS] Auto-refresh failed:', e.message));
+//     }, 2 * 60 * 1000);
     console.log('[LIVE-EVENTS] Auto-refresh every 2 minutes');
 
     // Kitajc stock sales — refresh every hour + low stock warning
