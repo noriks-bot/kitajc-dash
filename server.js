@@ -965,7 +965,7 @@ async function syncFullYear() {
                     byDate[date].socks += (product.socks || 0) * lineQty;
                     // Add SKU-based cost (resolve aliases)
                     const sku = resolveSkuAlias((item.sku || '').toUpperCase().trim());
-                    const skuCost = skuCostMap[sku] || 0;
+                    const skuCost = skuCostMap[sku] || 3;
                     if (!byDate[date].sku_product_cost) byDate[date].sku_product_cost = 0;
                     byDate[date].sku_product_cost += skuCost * lineQty;
                 }
@@ -1425,7 +1425,7 @@ async function syncRecent(daysBack = 7) {
                     byDate[date].socks += (product.socks || 0) * lineQty;
                     // SKU-based cost (resolve aliases)
                     const sku2 = resolveSkuAlias((item.sku || '').toUpperCase().trim());
-                    const skuCost2 = skuCostMap2[sku2] || 0;
+                    const skuCost2 = skuCostMap2[sku2] || 3;
                     if (!byDate[date].sku_product_cost) byDate[date].sku_product_cost = 0;
                     byDate[date].sku_product_cost += skuCost2 * lineQty;
                 }
@@ -1756,7 +1756,7 @@ const server = http.createServer(async (req, res) => {
             let stockChanged = false;
             for (const sku of Object.keys(salesAll)) {
                 if (!existingSkus.has(sku)) {
-                    items.push({ name: sku, sku, purchase_price: 0, initial_quantity: 0 });
+                    items.push({ name: sku, sku, purchase_price: 3, initial_quantity: 0 });
                     existingSkus.add(sku);
                     stockChanged = true;
                     console.log('[KITAJC-STOCK] Auto-added missing SKU:', sku);
