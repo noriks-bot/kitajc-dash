@@ -138,7 +138,7 @@ let _kitajcSalesCacheTime = 0;
 
 // SKU aliases: sales of alias SKUs are merged into the canonical SKU
 const SKU_ALIASES = {
-    'ELSPREJ-1': 'ELSPREJ',
+    'ELSPREJ-1': 'FELIFUN',
 };
 
 function resolveSkuAlias(sku) {
