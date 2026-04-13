@@ -30,3 +30,4 @@ shipping-costs.json
 campaign-names.json
 payment-cache.json
 kitajc-stock.*.bak.json
+*.bak.*

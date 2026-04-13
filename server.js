@@ -3794,7 +3794,7 @@ const server = http.createServer(async (req, res) => {
         try {
             const MK_SEARCH = 'https://main.metakocka.si/rest/eshop/v1/search';
             const MK_GET = 'https://main.metakocka.si/rest/eshop/v1/get_document';
-            const SK = 'YOUR_METAKOCKA_SECRET_KEY';
+            const SK = 'ee759602-961d-4431-ac64-0725ae8d9665';
             const CID = '6371';
 
             function mkPost(apiUrl, body) {
@@ -3832,7 +3832,7 @@ const server = http.createServer(async (req, res) => {
             // Filter: noriks, shipped status, matching country
             const COUNTRY_MAP = { HR: 'Croatia', CZ: 'Czech', PL: 'Poland', GR: 'Greece', SK: 'Slovakia', IT: 'Italy', HU: 'Hungary' };
             const filtered = allOrders.filter(o => {
-                if (!o.eshop_name || !/noriks/i.test(o.eshop_name)) return false;
+                if (!o.eshop_name || !/shopdbest|sofistar/i.test(o.eshop_name)) return false;
                 if (o.status_desc !== 'shipped') return false;
                 const shippedDate = (o.shipped_date || o.doc_date || '').substring(0, 10);
                 if (shippedDate !== date) return false;
@@ -3965,8 +3965,8 @@ async function generateLiveEvents() {
 async function _generateLiveEventsInner() {
     const MK_URL_SEARCH = 'https://main.metakocka.si/rest/eshop/v1/search';
     const MK_URL_GET = 'https://main.metakocka.si/rest/eshop/v1/get_document';
-    const SECRET_KEY = 'YOUR_METAKOCKA_SECRET_KEY';
-    const COMPANY_ID = 'YOUR_METAKOCKA_COMPANY_ID';
+    const SECRET_KEY = 'ee759602-961d-4431-ac64-0725ae8d9665';
+    const COMPANY_ID = '6371';
 
     function mkReq(url, body) {
         return new Promise((resolve, reject) => {
@@ -3997,7 +3997,7 @@ async function _generateLiveEventsInner() {
         await new Promise(r => setTimeout(r, 200));
     }
 
-    const wcOrders = allOrders.filter(o => (o.buyer_order || '').match(/^(?:NORIKS|SHOP_SDB)[-_][A-Z]{2}[-_]/));
+    const wcOrders = allOrders.filter(o => (o.buyer_order || '').match(/^(?:TOP_SDB|SOFI|NORIKS|SHOP_SDB)[-_][A-Z]{2}[-_]/));
     console.log('[LIVE-EVENTS] ' + wcOrders.length + ' WC orders, fetching events...');
 
     // SKIP first — anything containing these is NOT a problem we act on
@@ -4044,7 +4044,7 @@ async function _generateLiveEventsInner() {
     for (const order of wcOrders) {
         processed++;
         const buyerOrder = order.buyer_order || '';
-        const storeMatch = buyerOrder.match(/^(?:NORIKS|SHOP_SDB)[-_]([A-Z]{2})[-_]/);
+        const storeMatch = buyerOrder.match(/^(?:TOP_SDB|SOFI|NORIKS|SHOP_SDB)[-_]([A-Z]{2})[-_]/);
         const country = storeMatch ? storeMatch[1] : 'HR';
 
         try {
@@ -4221,8 +4221,8 @@ async function syncFbCrRecent() {
 async function generateShippingSpeedData(sseRes) {
     const MK_URL_SEARCH = 'https://main.metakocka.si/rest/eshop/v1/search';
     const MK_URL_GET = 'https://main.metakocka.si/rest/eshop/v1/get_document';
-    const SECRET_KEY = 'YOUR_METAKOCKA_SECRET_KEY';
-    const COMPANY_ID = 'YOUR_METAKOCKA_COMPANY_ID';
+    const SECRET_KEY = 'ee759602-961d-4431-ac64-0725ae8d9665';
+    const COMPANY_ID = '6371';
     
     function send(evt) {
         if (sseRes && !sseRes.writableEnded) sseRes.write('data: ' + JSON.stringify(evt) + '\n\n');
@@ -4292,7 +4292,7 @@ async function generateShippingSpeedData(sseRes) {
     // Filter to WC orders only
     const wcOrders = allOrders.filter(o => {
         const bo = o.buyer_order || '';
-        return bo.match(/^(?:NORIKS|SHOP_SDB)[-_][A-Z]{2}[-_]/);
+        return bo.match(/^(?:TOP_SDB|SOFI|NORIKS|SHOP_SDB)[-_][A-Z]{2}[-_]/);
     });
     
     console.log('📦 Shipping Speed: ' + wcOrders.length + ' WC orders found (of ' + allOrders.length + ' total)');
@@ -4318,7 +4318,7 @@ async function generateShippingSpeedData(sseRes) {
         }
         
         const buyerOrder = order.buyer_order || '';
-        const storeMatch = buyerOrder.match(/^(?:NORIKS|SHOP_SDB)[-_]([A-Z]{2})[-_]/);
+        const storeMatch = buyerOrder.match(/^(?:TOP_SDB|SOFI|NORIKS|SHOP_SDB)[-_]([A-Z]{2})[-_]/);
         const country = storeMatch ? storeMatch[1] : 'HR';
         
         if (!countryData[country]) {

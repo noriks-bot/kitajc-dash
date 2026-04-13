@@ -7,11 +7,11 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 
-const MK_SECRET = 'YOUR_METAKOCKA_SECRET_KEY';
+const MK_SECRET = 'ee759602-961d-4431-ac64-0725ae8d9665';
 const MK_COMPANY = '6371';
 const MK_ENDPOINT = 'https://main.metakocka.si/rest/eshop/v1/search';
 const MK_GET_ENDPOINT = 'https://main.metakocka.si/rest/eshop/v1/get_document';
-const OUTPUT_FILE = path.join(__dirname, '..', 'dashboard', 'rejection-data.json');
+const OUTPUT_FILE = path.join(__dirname, 'rejection-data.json');
 
 const BATCH_SIZE = 100;
 const DELAY_MS = 100;
@@ -23,6 +23,10 @@ const STATUS_MAP = {
     'shipped': 'in_transit'
 };
 
+// Only fetch last 30 days to avoid OOM on large datasets
+const FROM_DATE = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10) + '+02:00';
+const TO_DATE = new Date().toISOString().slice(0, 10) + '+02:00';
+
 async function fetchBatch(offset) {
     const res = await fetch(MK_ENDPOINT, {
         method: 'POST',
@@ -33,7 +37,11 @@ async function fetchBatch(offset) {
             doc_type: 'sales_order',
             result_type: 'doc',
             limit: BATCH_SIZE,
-            offset
+            offset,
+            query_advance: [
+                { type: 'doc_date_from', value: FROM_DATE },
+                { type: 'doc_date_to', value: TO_DATE }
+            ]
         })
     });
     if (!res.ok) throw new Error(`API ${res.status}`);
@@ -60,7 +68,7 @@ async function fetchOrderDetail(buyerOrder) {
 
 async function main() {
     const start = Date.now();
-    console.log('Scanning Metakocka orders for noriks.com (stream mode)...');
+    console.log('Scanning Metakocka orders for kitajc stores (stream mode)...');
     
     let totalNoriks = 0;
     const summary = { shipped: 0, completed: 0, rejected: 0, in_transit: 0 };
@@ -98,7 +106,7 @@ async function main() {
         empty = 0;
         
         for (const o of batch) {
-            if (!o.eshop_name || !/noriks/i.test(o.eshop_name)) continue;
+            if (!o.eshop_name || !/shopdbest|sofistar/i.test(o.eshop_name)) continue;
             totalNoriks++;
             
             if (!SHIPPED_STATUSES.includes(o.status_desc)) continue;
@@ -149,18 +157,18 @@ async function main() {
         if (offset % 2000 === 0) {
             const elapsed = ((Date.now() - start) / 1000).toFixed(0);
             const mem = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(0);
-            console.log(`  ${offset} scanned, ${totalNoriks} noriks (${elapsed}s, ${mem}MB)`);
+            console.log(`  ${offset} scanned, ${totalNoriks} kitajc (${elapsed}s, ${mem}MB)`);
         }
         
         await new Promise(r => setTimeout(r, DELAY_MS));
     }
     
     const elapsed = ((Date.now() - start) / 1000).toFixed(0);
-    console.log(`Scan complete: ${offset} total, ${totalNoriks} noriks orders (${elapsed}s)`);
+    console.log(`Scan complete: ${offset} total, ${totalNoriks} kitajc orders (${elapsed}s)`);
     console.log(`In-transit orders to fetch details: ${inTransitBasic.length}`);
     
     if (totalNoriks === 0) {
-        console.error('ERROR: No noriks orders found!');
+        console.error('ERROR: No kitajc orders found!');
         process.exit(1);
     }
     
