@@ -23,8 +23,8 @@ const STATUS_MAP = {
     'shipped': 'in_transit'
 };
 
-// Only fetch last 30 days to avoid OOM on large datasets
-const FROM_DATE = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10) + '+02:00';
+// Only fetch from April 2026 (kitajc launch)
+const FROM_DATE = '2026-04-01+02:00';
 const TO_DATE = new Date().toISOString().slice(0, 10) + '+02:00';
 
 async function fetchBatch(offset) {
