@@ -188,22 +188,23 @@ async function fetchKitajcSkuSales() {
     }
     _kitajcLastSyncDate = today;
 
-    // First run: fetch from STORE_START_DATE; subsequent: fetch only modified since last sync
-    const afterDate = _kitajcLastSyncAt || STORE_START_DATE + 'T00:00:00';
-    const isFirstRun = !_kitajcLastSyncAt;
-    if (isFirstRun) {
-        console.log('[KITAJC-STOCK] First run — full fetch from', afterDate);
-    } else {
-        console.log('[KITAJC-STOCK] Incremental fetch since', afterDate);
-    }
+    // Per-store last order ID tracking — fetch ONLY orders after last known ID
+    // _kitajcDb.lastOrderIds = { HR: 1234, CZ: 567, ... }
+    if (!_kitajcDb.lastOrderIds) _kitajcDb.lastOrderIds = {};
 
-    const syncStart = new Date().toISOString();
-
-    function wcGet(store, page) {
+    function wcGet(store, afterDate, page) {
+        // afterDate: ISO date string — fetch orders created after this datetime
+        // page: for first-run pagination
         return new Promise((resolve) => {
             const auth = Buffer.from(`${store.ck}:${store.cs}`).toString('base64');
-            const afterParam = isFirstRun ? `after=${STORE_START_DATE}T00:00:00` : `modified_after=${afterDate}`;
-            const urlStr = `${store.url}/wp-json/wc/v3/orders?status=processing,completed&${afterParam}&per_page=100&page=${page}`;
+            let urlStr;
+            if (afterDate) {
+                // Incremental: only orders created after last known order date
+                urlStr = `${store.url}/wp-json/wc/v3/orders?status=processing,completed&after=${afterDate}&orderby=date&order=asc&per_page=100`;
+            } else {
+                // First run: fetch all from launch date with pagination
+                urlStr = `${store.url}/wp-json/wc/v3/orders?status=processing,completed&after=${STORE_START_DATE}T00:00:00&orderby=date&order=asc&per_page=100&page=${page || 1}`;
+            }
             const parsed = new URL(urlStr);
             const opts = { hostname: parsed.hostname, path: parsed.pathname + parsed.search, headers: { Authorization: `Basic ${auth}` }, timeout: 20000 };
             const req = https.get(opts, res => {
@@ -222,32 +223,67 @@ async function fetchKitajcSkuSales() {
         });
     }
 
+    let totalNew = 0;
     for (const store of KITAJC_WC_STORES) {
+        const lastOrderDate = _kitajcDb.lastOrderIds[store.name] || null; // ISO datetime of last order
+        let newLastOrderDate = lastOrderDate;
         let page = 1;
-        while (true) {
-            const orders = await wcGet(store, page);
-            if (!Array.isArray(orders) || orders.length === 0) break;
-            for (const order of orders) {
-                const d = (order.date_created || '').slice(0, 10);
-                for (const item of (order.line_items || [])) {
-                    let sku = (item.sku || '').toUpperCase().trim();
-                    if (!sku) continue;
-                    sku = resolveSkuAlias(sku);
-                    const qty = item.quantity || 1;
-                    _kitajcSalesAll[sku] = (_kitajcSalesAll[sku] || 0) + qty;
-                    if (d === today) _kitajcSalesToday[sku] = (_kitajcSalesToday[sku] || 0) + qty;
+
+        if (lastOrderDate) {
+            // Incremental: samo orderji po datumu zadnjega
+            const orders = await wcGet(store, lastOrderDate, 1);
+            if (Array.isArray(orders) && orders.length > 0) {
+                console.log(`[KITAJC-STOCK] ${store.name}: ${orders.length} new orders since ${lastOrderDate}`);
+                for (const order of orders) {
+                    const d = (order.date_created || '').slice(0, 10);
+                    // Track latest order date
+                    if (!newLastOrderDate || order.date_created > newLastOrderDate) newLastOrderDate = order.date_created;
+                    for (const item of (order.line_items || [])) {
+                        let sku = (item.sku || '').toUpperCase().trim();
+                        if (!sku) continue;
+                        sku = resolveSkuAlias(sku);
+                        const qty = item.quantity || 1;
+                        _kitajcSalesAll[sku] = (_kitajcSalesAll[sku] || 0) + qty;
+                        if (d === today) _kitajcSalesToday[sku] = (_kitajcSalesToday[sku] || 0) + qty;
+                        totalNew++;
+                    }
                 }
+            } else {
+                console.log(`[KITAJC-STOCK] ${store.name}: no new orders`);
             }
-            if (orders.length < 100) break;
-            page++;
+        } else {
+            // First run: paginiraj vse od STORE_START_DATE
+            console.log(`[KITAJC-STOCK] ${store.name}: first run, full fetch`);
+            while (true) {
+                const orders = await wcGet(store, null, page);
+                if (!Array.isArray(orders) || orders.length === 0) break;
+                for (const order of orders) {
+                    const d = (order.date_created || '').slice(0, 10);
+                    if (!newLastOrderDate || order.date_created > newLastOrderDate) newLastOrderDate = order.date_created;
+                    for (const item of (order.line_items || [])) {
+                        let sku = (item.sku || '').toUpperCase().trim();
+                        if (!sku) continue;
+                        sku = resolveSkuAlias(sku);
+                        const qty = item.quantity || 1;
+                        _kitajcSalesAll[sku] = (_kitajcSalesAll[sku] || 0) + qty;
+                        if (d === today) _kitajcSalesToday[sku] = (_kitajcSalesToday[sku] || 0) + qty;
+                    }
+                    totalNew++;
+                }
+                if (orders.length < 100) break;
+                page++;
+            }
+        }
+
+        if (newLastOrderDate && newLastOrderDate !== lastOrderDate) {
+            _kitajcDb.lastOrderIds[store.name] = newLastOrderDate;
         }
     }
 
-    _kitajcLastSyncAt = syncStart;
+    _kitajcLastSyncAt = new Date().toISOString();
     _kitajcLastSyncDate = today;
-    // Save to disk so next restart doesn't need full refetch
-    saveKitajcSalesDb({ salesAll: _kitajcSalesAll, salesToday: _kitajcSalesToday, lastSyncAt: _kitajcLastSyncAt, lastSyncDate: _kitajcLastSyncDate });
-    console.log('[KITAJC-STOCK] Sync done. salesAll:', JSON.stringify(_kitajcSalesAll), 'today:', JSON.stringify(_kitajcSalesToday));
+    saveKitajcSalesDb({ salesAll: _kitajcSalesAll, salesToday: _kitajcSalesToday, lastSyncAt: _kitajcLastSyncAt, lastSyncDate: _kitajcLastSyncDate, lastOrderIds: _kitajcDb.lastOrderIds });
+    console.log(`[KITAJC-STOCK] Sync done. ${totalNew} new items. salesAll:`, JSON.stringify(_kitajcSalesAll));
     return { salesAll: _kitajcSalesAll, salesToday: _kitajcSalesToday };
 }
 
