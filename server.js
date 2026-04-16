@@ -8,11 +8,31 @@ const cron = require('node-cron');
 const { execFile } = require('child_process');
 const { detectProduct: _sharedDetectProduct, setSkuOverrides: _setSharedOverrides } = require('./detect-product');
 const { fetchSales } = require('./fetch-sales');
+const Database = require('better-sqlite3');
 
 const PORT = 3010;
 const STORE_START_DATE = "2026-04-01"; // Kitajc launch date - never fetch orders before this date
 const CACHE_FILE = path.join(__dirname, 'cache.json');
-const KITAJC_SALES_DB_FILE = path.join(__dirname, 'kitajc-sales-db.json');
+// SQLite DB za Kitajc sales (enako kot Flores)
+const kitajcDb = new Database(path.join(__dirname, 'kitajc-sales.db'));
+kitajcDb.exec(`
+  CREATE TABLE IF NOT EXISTS kitajc_orders (
+    order_id INTEGER NOT NULL,
+    store TEXT NOT NULL,
+    sku TEXT NOT NULL,
+    qty INTEGER NOT NULL,
+    order_date TEXT NOT NULL,
+    PRIMARY KEY (order_id, store, sku)
+  );
+  CREATE TABLE IF NOT EXISTS kitajc_sync_state (
+    store TEXT PRIMARY KEY,
+    last_sync_at TEXT
+  );
+`);
+const kitajcGetSyncState = kitajcDb.prepare('SELECT last_sync_at FROM kitajc_sync_state WHERE store = ?');
+const kitajcSetSyncState = kitajcDb.prepare('INSERT OR REPLACE INTO kitajc_sync_state (store, last_sync_at) VALUES (?, ?)');
+const kitajcInsertOrder = kitajcDb.prepare('INSERT OR IGNORE INTO kitajc_orders (order_id, store, sku, qty, order_date) VALUES (?, ?, ?, ?, ?)');
+const kitajcInsertMany = kitajcDb.transaction((rows) => { for (const r of rows) kitajcInsertOrder.run(r.order_id, r.store, r.sku, r.qty, r.order_date); });
 const SKU_OVERRIDES_FILE = path.join(__dirname, 'sku-overrides.json');
 const CUSTOMER_HISTORY_FILE = path.join(__dirname, 'customer-history.json');
 const USERS_FILE = path.join(__dirname, 'users.json');
@@ -150,61 +170,34 @@ async function getKitajcSkuSales() {
     if (_kitajcSalesCache && (now - _kitajcSalesCacheTime) < 5 * 60 * 1000) {
         return _kitajcSalesCache;
     }
-    const result = await fetchKitajcSkuSales();
+    // Sync new orders into SQLite, then read totals from DB
+    await kitajcSyncOrders();
+    const result = kitajcBuildSalesFromDb();
     _kitajcSalesCache = result;
     _kitajcSalesCacheTime = now;
     console.log('[KITAJC-STOCK] Sales refreshed:', JSON.stringify(result.salesToday));
     return result;
 }
 
-// Persistent sales DB — loaded from disk on startup, saved after each sync
-function loadKitajcSalesDb() {
-    try {
-        if (fs.existsSync(KITAJC_SALES_DB_FILE)) {
-            const d = JSON.parse(fs.readFileSync(KITAJC_SALES_DB_FILE, 'utf8'));
-            return d;
-        }
-    } catch(e) { console.warn('[KITAJC-STOCK] Could not load sales DB:', e.message); }
-    return { salesAll: {}, salesToday: {}, lastSyncAt: null, lastSyncDate: null };
+// Kitajc sales — preračunamo iz SQLite ob zagonu in po vsakem syncu
+function kitajcBuildSalesFromDb(forDate) {
+    const salesAll = {}, salesToday = {};
+    const today = forDate || new Date().toISOString().split('T')[0];
+    const rows = kitajcDb.prepare('SELECT sku, SUM(qty) as total FROM kitajc_orders GROUP BY sku').all();
+    for (const r of rows) salesAll[r.sku] = r.total;
+    const todayRows = kitajcDb.prepare('SELECT sku, SUM(qty) as total FROM kitajc_orders WHERE order_date = ? GROUP BY sku').all(today);
+    for (const r of todayRows) salesToday[r.sku] = r.total;
+    return { salesAll, salesToday };
 }
-function saveKitajcSalesDb(db) {
-    try { fs.writeFileSync(KITAJC_SALES_DB_FILE, JSON.stringify(db)); }
-    catch(e) { console.warn('[KITAJC-STOCK] Could not save sales DB:', e.message); }
-}
-let _kitajcDb = loadKitajcSalesDb();
-let _kitajcSalesAll = _kitajcDb.salesAll || {};
-let _kitajcSalesToday = _kitajcDb.salesToday || {};
-let _kitajcLastSyncAt = _kitajcDb.lastSyncAt || null;
-let _kitajcLastSyncDate = _kitajcDb.lastSyncDate || null;
-console.log('[KITAJC-STOCK] Loaded from disk — lastSync:', _kitajcLastSyncAt, 'SKUs:', Object.keys(_kitajcSalesAll).length);
+let _kitajcSalesCache = null;
+let _kitajcSalesCacheTime = 0;
 
-async function fetchKitajcSkuSales() {
-    const today = new Date().toISOString().split('T')[0];
-
-    // Day rollover: reset salesToday
-    if (_kitajcLastSyncDate && _kitajcLastSyncDate !== today) {
-        console.log('[KITAJC-STOCK] New day detected, resetting salesToday');
-        _kitajcSalesToday = {};
-    }
-    _kitajcLastSyncDate = today;
-
-    // Per-store last order ID tracking — fetch ONLY orders after last known ID
-    // _kitajcDb.lastOrderIds = { HR: 1234, CZ: 567, ... }
-    if (!_kitajcDb.lastOrderIds) _kitajcDb.lastOrderIds = {};
-
+async function kitajcSyncOrders() {
     function wcGet(store, afterDate, page) {
-        // afterDate: ISO date string — fetch orders created after this datetime
-        // page: for first-run pagination
         return new Promise((resolve) => {
             const auth = Buffer.from(`${store.ck}:${store.cs}`).toString('base64');
-            let urlStr;
-            if (afterDate) {
-                // Incremental: only orders created after last known order date
-                urlStr = `${store.url}/wp-json/wc/v3/orders?status=processing,completed&after=${afterDate}&orderby=date&order=asc&per_page=100`;
-            } else {
-                // First run: fetch all from launch date with pagination
-                urlStr = `${store.url}/wp-json/wc/v3/orders?status=processing,completed&after=${STORE_START_DATE}T00:00:00&orderby=date&order=asc&per_page=100&page=${page || 1}`;
-            }
+            const afterParam = afterDate ? `modified_after=${afterDate}` : `after=${STORE_START_DATE}T00:00:00`;
+            const urlStr = `${store.url}/wp-json/wc/v3/orders?status=processing,completed&${afterParam}&per_page=100&page=${page || 1}`;
             const parsed = new URL(urlStr);
             const opts = { hostname: parsed.hostname, path: parsed.pathname + parsed.search, headers: { Authorization: `Basic ${auth}` }, timeout: 20000 };
             const req = https.get(opts, res => {
@@ -225,66 +218,31 @@ async function fetchKitajcSkuSales() {
 
     let totalNew = 0;
     for (const store of KITAJC_WC_STORES) {
-        const lastOrderDate = _kitajcDb.lastOrderIds[store.name] || null; // ISO datetime of last order
-        let newLastOrderDate = lastOrderDate;
+        const syncRow = kitajcGetSyncState.get(store.name);
+        const lastSyncAt = syncRow ? syncRow.last_sync_at : null;
+
         let page = 1;
-
-        if (lastOrderDate) {
-            // Incremental: samo orderji po datumu zadnjega
-            const orders = await wcGet(store, lastOrderDate, 1);
-            if (Array.isArray(orders) && orders.length > 0) {
-                console.log(`[KITAJC-STOCK] ${store.name}: ${orders.length} new orders since ${lastOrderDate}`);
-                for (const order of orders) {
-                    const d = (order.date_created || '').slice(0, 10);
-                    // Track latest order date
-                    if (!newLastOrderDate || order.date_created > newLastOrderDate) newLastOrderDate = order.date_created;
-                    for (const item of (order.line_items || [])) {
-                        let sku = (item.sku || '').toUpperCase().trim();
-                        if (!sku) continue;
-                        sku = resolveSkuAlias(sku);
-                        const qty = item.quantity || 1;
-                        _kitajcSalesAll[sku] = (_kitajcSalesAll[sku] || 0) + qty;
-                        if (d === today) _kitajcSalesToday[sku] = (_kitajcSalesToday[sku] || 0) + qty;
-                        totalNew++;
-                    }
+        while (true) {
+            const orders = await wcGet(store, lastSyncAt, page);
+            if (!Array.isArray(orders) || orders.length === 0) break;
+            const rows = [];
+            for (const order of orders) {
+                const d = (order.date_created || '').slice(0, 10);
+                for (const item of (order.line_items || [])) {
+                    let sku = (item.sku || '').toUpperCase().trim();
+                    if (!sku) continue;
+                    sku = resolveSkuAlias(sku);
+                    rows.push({ order_id: order.id, store: store.name, sku, qty: item.quantity || 1, order_date: d });
                 }
-            } else {
-                console.log(`[KITAJC-STOCK] ${store.name}: no new orders`);
             }
-        } else {
-            // First run: paginiraj vse od STORE_START_DATE
-            console.log(`[KITAJC-STOCK] ${store.name}: first run, full fetch`);
-            while (true) {
-                const orders = await wcGet(store, null, page);
-                if (!Array.isArray(orders) || orders.length === 0) break;
-                for (const order of orders) {
-                    const d = (order.date_created || '').slice(0, 10);
-                    if (!newLastOrderDate || order.date_created > newLastOrderDate) newLastOrderDate = order.date_created;
-                    for (const item of (order.line_items || [])) {
-                        let sku = (item.sku || '').toUpperCase().trim();
-                        if (!sku) continue;
-                        sku = resolveSkuAlias(sku);
-                        const qty = item.quantity || 1;
-                        _kitajcSalesAll[sku] = (_kitajcSalesAll[sku] || 0) + qty;
-                        if (d === today) _kitajcSalesToday[sku] = (_kitajcSalesToday[sku] || 0) + qty;
-                    }
-                    totalNew++;
-                }
-                if (orders.length < 100) break;
-                page++;
-            }
+            if (rows.length) { kitajcInsertMany(rows); totalNew += rows.length; }
+            if (orders.length < 100) break;
+            page++;
         }
-
-        if (newLastOrderDate && newLastOrderDate !== lastOrderDate) {
-            _kitajcDb.lastOrderIds[store.name] = newLastOrderDate;
-        }
+        kitajcSetSyncState.run(store.name, new Date().toISOString());
+        if (!lastSyncAt) console.log(`[KITAJC-STOCK] ${store.name}: first sync done`);
     }
-
-    _kitajcLastSyncAt = new Date().toISOString();
-    _kitajcLastSyncDate = today;
-    saveKitajcSalesDb({ salesAll: _kitajcSalesAll, salesToday: _kitajcSalesToday, lastSyncAt: _kitajcLastSyncAt, lastSyncDate: _kitajcLastSyncDate, lastOrderIds: _kitajcDb.lastOrderIds });
-    console.log(`[KITAJC-STOCK] Sync done. ${totalNew} new items. salesAll:`, JSON.stringify(_kitajcSalesAll));
-    return { salesAll: _kitajcSalesAll, salesToday: _kitajcSalesToday };
+    if (totalNew > 0) console.log(`[KITAJC-STOCK] Sync: ${totalNew} new line items`);
 }
 
 // Load product counts from stock-data.json (single source of truth)
