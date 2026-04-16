@@ -4026,7 +4026,7 @@ async function _generateLiveEventsInner() {
     }
 
     const toDate = new Date();
-    const fromDate = new Date(); fromDate.setDate(toDate.getDate() - 3);
+    const fromDate = new Date(); fromDate.setDate(toDate.getDate() - 10);
     const fromStr = fromDate.toISOString().slice(0,10) + '+02:00';
     const toStr = toDate.toISOString().slice(0,10) + '+02:00';
 
