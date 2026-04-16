@@ -4026,7 +4026,7 @@ async function _generateLiveEventsInner() {
     }
 
     const toDate = new Date();
-    const fromDate = new Date(); fromDate.setDate(toDate.getDate() - 14);
+    const fromDate = new Date(); fromDate.setDate(toDate.getDate() - 3);
     const fromStr = fromDate.toISOString().slice(0,10) + '+02:00';
     const toStr = toDate.toISOString().slice(0,10) + '+02:00';
 
@@ -4042,7 +4042,7 @@ async function _generateLiveEventsInner() {
         await new Promise(r => setTimeout(r, 200));
     }
 
-    const wcOrders = allOrders.filter(o => (o.buyer_order || '').match(/^(?:TOP_SDB|SOFI|NORIKS|SHOP_SDB)[-_][A-Z]{2}[-_]/));
+    const wcOrders = allOrders.filter(o => (o.buyer_order || '').match(/^SHOP_SDB[-_][A-Z]{2}[-_]/));
     console.log('[LIVE-EVENTS] ' + wcOrders.length + ' WC orders, fetching events...');
 
     // SKIP first — anything containing these is NOT a problem we act on
