@@ -12,6 +12,7 @@ const { fetchSales } = require('./fetch-sales');
 const PORT = 3010;
 const STORE_START_DATE = "2026-04-01"; // Kitajc launch date - never fetch orders before this date
 const CACHE_FILE = path.join(__dirname, 'cache.json');
+const KITAJC_SALES_DB_FILE = path.join(__dirname, 'kitajc-sales-db.json');
 const SKU_OVERRIDES_FILE = path.join(__dirname, 'sku-overrides.json');
 const CUSTOMER_HISTORY_FILE = path.join(__dirname, 'customer-history.json');
 const USERS_FILE = path.join(__dirname, 'users.json');
@@ -156,11 +157,26 @@ async function getKitajcSkuSales() {
     return result;
 }
 
-// Persistent sales accumulator — built up incrementally, never full-refetch
-let _kitajcSalesAll = {};
-let _kitajcSalesToday = {};
-let _kitajcLastSyncAt = null; // ISO string of last incremental sync
-let _kitajcLastSyncDate = null; // YYYY-MM-DD of last sync (to detect day rollover)
+// Persistent sales DB — loaded from disk on startup, saved after each sync
+function loadKitajcSalesDb() {
+    try {
+        if (fs.existsSync(KITAJC_SALES_DB_FILE)) {
+            const d = JSON.parse(fs.readFileSync(KITAJC_SALES_DB_FILE, 'utf8'));
+            return d;
+        }
+    } catch(e) { console.warn('[KITAJC-STOCK] Could not load sales DB:', e.message); }
+    return { salesAll: {}, salesToday: {}, lastSyncAt: null, lastSyncDate: null };
+}
+function saveKitajcSalesDb(db) {
+    try { fs.writeFileSync(KITAJC_SALES_DB_FILE, JSON.stringify(db)); }
+    catch(e) { console.warn('[KITAJC-STOCK] Could not save sales DB:', e.message); }
+}
+let _kitajcDb = loadKitajcSalesDb();
+let _kitajcSalesAll = _kitajcDb.salesAll || {};
+let _kitajcSalesToday = _kitajcDb.salesToday || {};
+let _kitajcLastSyncAt = _kitajcDb.lastSyncAt || null;
+let _kitajcLastSyncDate = _kitajcDb.lastSyncDate || null;
+console.log('[KITAJC-STOCK] Loaded from disk — lastSync:', _kitajcLastSyncAt, 'SKUs:', Object.keys(_kitajcSalesAll).length);
 
 async function fetchKitajcSkuSales() {
     const today = new Date().toISOString().split('T')[0];
@@ -228,6 +244,9 @@ async function fetchKitajcSkuSales() {
     }
 
     _kitajcLastSyncAt = syncStart;
+    _kitajcLastSyncDate = today;
+    // Save to disk so next restart doesn't need full refetch
+    saveKitajcSalesDb({ salesAll: _kitajcSalesAll, salesToday: _kitajcSalesToday, lastSyncAt: _kitajcLastSyncAt, lastSyncDate: _kitajcLastSyncDate });
     console.log('[KITAJC-STOCK] Sync done. salesAll:', JSON.stringify(_kitajcSalesAll), 'today:', JSON.stringify(_kitajcSalesToday));
     return { salesAll: _kitajcSalesAll, salesToday: _kitajcSalesToday };
 }
