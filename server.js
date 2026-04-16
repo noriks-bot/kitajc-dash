@@ -156,16 +156,47 @@ async function getKitajcSkuSales() {
     return result;
 }
 
+// Persistent sales accumulator — built up incrementally, never full-refetch
+let _kitajcSalesAll = {};
+let _kitajcSalesToday = {};
+let _kitajcLastSyncAt = null; // ISO string of last incremental sync
+let _kitajcLastSyncDate = null; // YYYY-MM-DD of last sync (to detect day rollover)
+
 async function fetchKitajcSkuSales() {
-    const salesAll = {}, salesToday = {};
     const today = new Date().toISOString().split('T')[0];
+
+    // Day rollover: reset salesToday
+    if (_kitajcLastSyncDate && _kitajcLastSyncDate !== today) {
+        console.log('[KITAJC-STOCK] New day detected, resetting salesToday');
+        _kitajcSalesToday = {};
+    }
+    _kitajcLastSyncDate = today;
+
+    // First run: fetch from STORE_START_DATE; subsequent: fetch only modified since last sync
+    const afterDate = _kitajcLastSyncAt || STORE_START_DATE + 'T00:00:00';
+    const isFirstRun = !_kitajcLastSyncAt;
+    if (isFirstRun) {
+        console.log('[KITAJC-STOCK] First run — full fetch from', afterDate);
+    } else {
+        console.log('[KITAJC-STOCK] Incremental fetch since', afterDate);
+    }
+
+    const syncStart = new Date().toISOString();
+
     function wcGet(store, page) {
         return new Promise((resolve) => {
             const auth = Buffer.from(`${store.ck}:${store.cs}`).toString('base64');
-            const urlStr = `${store.url}/wp-json/wc/v3/orders?status=processing,completed&after=${STORE_START_DATE}T00:00:00&per_page=100&page=${page}`;
+            const afterParam = isFirstRun ? `after=${STORE_START_DATE}T00:00:00` : `modified_after=${afterDate}`;
+            const urlStr = `${store.url}/wp-json/wc/v3/orders?status=processing,completed&${afterParam}&per_page=100&page=${page}`;
             const parsed = new URL(urlStr);
             const opts = { hostname: parsed.hostname, path: parsed.pathname + parsed.search, headers: { Authorization: `Basic ${auth}` }, timeout: 20000 };
             const req = https.get(opts, res => {
+                if (res.statusCode !== 200) {
+                    console.warn(`[KITAJC-STOCK] ${store.name} HTTP ${res.statusCode}, skip`);
+                    res.resume();
+                    resolve([]);
+                    return;
+                }
                 let data = '';
                 res.on('data', c => data += c);
                 res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { resolve([]); } });
@@ -174,6 +205,7 @@ async function fetchKitajcSkuSales() {
             req.on('timeout', () => { req.destroy(); resolve([]); });
         });
     }
+
     for (const store of KITAJC_WC_STORES) {
         let page = 1;
         while (true) {
@@ -186,16 +218,18 @@ async function fetchKitajcSkuSales() {
                     if (!sku) continue;
                     sku = resolveSkuAlias(sku);
                     const qty = item.quantity || 1;
-                    salesAll[sku] = (salesAll[sku] || 0) + qty;
-                    if (d === today) salesToday[sku] = (salesToday[sku] || 0) + qty;
+                    _kitajcSalesAll[sku] = (_kitajcSalesAll[sku] || 0) + qty;
+                    if (d === today) _kitajcSalesToday[sku] = (_kitajcSalesToday[sku] || 0) + qty;
                 }
             }
             if (orders.length < 100) break;
             page++;
         }
     }
-    console.log('[KITAJC-STOCK] Fetched salesAll:', JSON.stringify(salesAll), 'today:', JSON.stringify(salesToday));
-    return { salesAll, salesToday };
+
+    _kitajcLastSyncAt = syncStart;
+    console.log('[KITAJC-STOCK] Sync done. salesAll:', JSON.stringify(_kitajcSalesAll), 'today:', JSON.stringify(_kitajcSalesToday));
+    return { salesAll: _kitajcSalesAll, salesToday: _kitajcSalesToday };
 }
 
 // Load product counts from stock-data.json (single source of truth)

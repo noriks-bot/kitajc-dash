@@ -1199,7 +1199,7 @@
             try {
                 const dataController = new AbortController();
                 const dataTimeout = setTimeout(() => dataController.abort(), 30000);
-                const res = await fetch(`/dashboard/api/data?start=${start}&end=${end}`, { signal: dataController.signal });
+                const res = await fetch(`/dashboard/api/data?start=${start}&end=${end}`, { signal: dataController.signal, cache: "no-store" });
                 clearTimeout(dataTimeout);
                 if (!res.ok) throw new Error('API error');
                 const data = await res.json();
