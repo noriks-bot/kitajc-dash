@@ -189,8 +189,6 @@ function kitajcBuildSalesFromDb(forDate) {
     for (const r of todayRows) salesToday[r.sku] = r.total;
     return { salesAll, salesToday };
 }
-let _kitajcSalesCache = null;
-let _kitajcSalesCacheTime = 0;
 
 async function kitajcSyncOrders() {
     function wcGet(store, afterDate, page) {
