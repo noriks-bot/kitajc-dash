@@ -4630,40 +4630,19 @@ server.listen(PORT, '0.0.0.0', async () => {
     // Origin data is now built during main sync — no separate fetch needed
     console.log('[ORIGIN] Data loaded: ' + Object.keys(originData.daily || {}).length + ' days');
 
-    // Generate shipping speed report on startup if missing or old
-    try {
-        if (!fs.existsSync(SHIPPING_SPEED_FILE)) {
-            console.log('🔄 Generating initial shipping speed report...');
-            generateShippingSpeedData(null).catch(e => console.error('❌ Shipping speed gen failed:', e.message));
-        } else {
-            const ssStats = fs.statSync(SHIPPING_SPEED_FILE);
-            const ssAgeHours = (Date.now() - ssStats.mtimeMs) / (1000 * 60 * 60);
-            if (ssAgeHours > 24) {
-                console.log('🔄 Refreshing shipping speed report (' + Math.round(ssAgeHours) + 'h old)...');
-                generateShippingSpeedData(null).catch(e => console.error('❌ Shipping speed gen failed:', e.message));
-            }
-        }
-    } catch (error) {
-        console.error('❌ Initial shipping speed report failed:', error.message);
-    }
+    // Shipping speed: skip on startup, refresh hourly instead
+    console.log('[SHIPPING] Skipping startup generation — will refresh hourly');
+    setInterval(() => {
+        console.log('[SHIPPING] Hourly refresh...');
+        generateShippingSpeedData(null).catch(e => console.error('❌ Shipping speed gen failed:', e.message));
+    }, 60 * 60 * 1000);
 
-    // Live Events: generate on startup if missing or >10min old, then refresh every 10min
-    try {
-        const leAge = liveEventsData.generatedAt ? (Date.now() - new Date(liveEventsData.generatedAt).getTime()) / 60000 : Infinity;
-        if (leAge > 2) {
-            console.log('[LIVE-EVENTS] Generating initial data...');
-            await generateLiveEvents();
-        } else {
-            console.log('[LIVE-EVENTS] Data fresh (' + Math.round(leAge) + 'min old), ' + liveEventsData.events.length + ' events');
-        }
-    } catch (e) {
-        console.error('[LIVE-EVENTS] Initial generation failed:', e.message);
-    }
-    // Auto-refresh every 2 minutes
-//     setInterval(() => {
-//         generateLiveEvents().catch(e => console.error('[LIVE-EVENTS] Auto-refresh failed:', e.message));
-//     }, 2 * 60 * 1000);
-    console.log('[LIVE-EVENTS] Auto-refresh every 2 minutes');
+    // Live Events: skip on startup, refresh hourly
+    console.log('[LIVE-EVENTS] Skipping startup generation — will refresh hourly');
+    setInterval(() => {
+        console.log('[LIVE-EVENTS] Hourly refresh...');
+        generateLiveEvents().catch(e => console.error('[LIVE-EVENTS] Hourly refresh failed:', e.message));
+    }, 60 * 60 * 1000);
 
     // Kitajc stock sales — refresh every hour + low stock warning
     setInterval(() => {
