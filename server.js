@@ -141,7 +141,7 @@ if (!fs.existsSync(KITAJC_STOCK_FILE)) {
         { name: 'elemas',    sku: 'ELEMAS',    purchase_price: 6.85, initial_quantity: 1008 },
         { name: 'secug',     sku: 'SECUG',     purchase_price: 3.36, initial_quantity: 828  },
         { name: 'felifun',   sku: 'FELIFUN',   purchase_price: 4.00, initial_quantity: 600  },
-        { name: 'frypan',    sku: 'FRYPAN',    purchase_price: 2.73, initial_quantity: 2016 },
+        { name: 'fryall',    sku: 'FRYALL',    purchase_price: 2.73, initial_quantity: 2016 },
         { name: 'prskalica', sku: 'PRSKALICA', purchase_price: 3.02, initial_quantity: 2040 },
         { name: 'defrost',   sku: 'DEFROST',   purchase_price: 3.00, initial_quantity: 1000 },
     ]);
@@ -4577,7 +4577,9 @@ async function refreshAdvertiserCache() {
 function scheduleHourlySync() {
     const now = new Date();
     const nextHour = new Date(now);
-    nextHour.setHours(now.getHours() + 1, 0, 0, 0);
+    nextHour.setHours(now.getHours() + 1, 30, 0, 0);
+    // If we already passed :30 this hour, schedule for next hour :30
+    if (nextHour <= now) nextHour.setHours(nextHour.getHours() + 1);
     const msUntilNextHour = nextHour - now;
     
     setTimeout(() => {
@@ -4616,7 +4618,7 @@ server.listen(PORT, '0.0.0.0', async () => {
     scheduleHourlySync();
 
     // Rejection report auto-update every hour
-    cron.schedule("0 * * * *", () => {
+    cron.schedule("30 * * * *", () => {
         console.log("🔔 Scheduled rejection report update...");
         execFile("node", [path.join(__dirname, "generate-rejection-data.js")], (err, stdout, stderr) => {
             if (stdout) console.log(stdout);
