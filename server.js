@@ -1907,7 +1907,7 @@ const server = http.createServer(async (req, res) => {
         const role = session.role || 'admin';
         const advertiserPages = ['/advertiser.html', '/origin.html'];
         const advertiserAPIs = ['/api/advertiser-data', '/api/origin-data'];
-        const warehousePages = ['/stock-report.html', '/stock-arrivals.html', '/purchasing.html', '/stock.html', '/rejection-report.html', '/rejections.html', '/live-events.html', '/shipping-speed.html', '/skus.html', '/shipping.html'];
+        const warehousePages = ['/stock.html', '/stock-arrivals.html', '/purchasing.html', '/stock.html', '/rejection-report.html', '/rejections.html', '/live-events.html', '/shipping-speed.html', '/skus.html', '/shipping.html'];
         const warehouseAPIs = ['/api/stock', '/api/stock-arrivals', '/api/purchasing', '/api/rejections', '/api/rejection-report', '/api/shipping-speed', '/api/shipping-costs', '/api/skus', '/api/live-events', '/api/live-events/resolve', '/api/in-transit-orders', '/api/live-events/refresh', '/api/hr-tracking', '/api/expedico-tracking', '/api/local-tracking', '/api/cs-notes'];
 
         if (role === 'advertiser') {
@@ -1925,7 +1925,7 @@ const server = http.createServer(async (req, res) => {
                 pathname.endsWith('.js') || pathname.endsWith('.css') || pathname.endsWith('.json') || pathname === '/api/me' || pathname === '/api/logout';
             if (!isAllowed) {
                 if (pathname.startsWith('/api/')) { res.statusCode = 403; res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ error: 'Forbidden' })); }
-                else { res.writeHead(302, { Location: isAdvertiserPrefix ? '/advertiser/' : '/dashboard/stock-report.html' }); res.end(); }
+                else { res.writeHead(302, { Location: isAdvertiserPrefix ? '/advertiser/' : '/dashboard/stock.html' }); res.end(); }
                 return;
             }
         }
