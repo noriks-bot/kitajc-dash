@@ -4617,17 +4617,33 @@ server.listen(PORT, '0.0.0.0', async () => {
 
     scheduleHourlySync();
 
-    // Rejection report auto-update every hour
-    cron.schedule("30 * * * *", () => {
+    // === NOČNI MIR za Metakocka analitiko (23:00–07:00 lokalno) ===
+    // Metakocka ponoči izvaja batch obdelave in serializira REST search klice
+    // per-company (search lock) — naši nočni analitični full-scani so blokirali
+    // packing app. Analitika ponoči ni potrebna, vse se osveži zjutraj.
+    function isNightQuietHours() {
+        const h = parseInt(new Date().toLocaleString('en-GB', { timeZone: 'Europe/Ljubljana', hour: '2-digit', hour12: false }), 10);
+        return h >= 23 || h < 7;
+    }
+
+    // Rejection report auto-update — samo podnevi (7:30–22:30) + overlap guard
+    let rejectionReportRunning = false;
+    cron.schedule("30 7-22 * * *", () => {
+        if (rejectionReportRunning) {
+            console.log("⏭️ Rejection report še teče — skip (overlap guard)");
+            return;
+        }
+        rejectionReportRunning = true;
         console.log("🔔 Scheduled rejection report update...");
         execFile("node", [path.join(__dirname, "generate-rejection-data.js")], (err, stdout, stderr) => {
+            rejectionReportRunning = false;
             if (stdout) console.log(stdout);
             if (stderr) console.error(stderr);
             if (err) console.error("❌ Rejection report failed:", err.message);
             else console.log("✅ Rejection report updated");
         });
     }, { timezone: "Europe/Vienna" });
-    console.log("📅 Rejection report scheduled every hour");
+    console.log("📅 Rejection report scheduled hourly 7:30–22:30 (nočni mir za Metakocko)");
 
     // Origin data is now built during main sync — no separate fetch needed
     console.log('[ORIGIN] Data loaded: ' + Object.keys(originData.daily || {}).length + ' days');
@@ -4635,6 +4651,7 @@ server.listen(PORT, '0.0.0.0', async () => {
     // Shipping speed: skip on startup, refresh hourly instead
     console.log('[SHIPPING] Skipping startup generation — will refresh hourly');
     setInterval(() => {
+        if (isNightQuietHours()) { console.log('[SHIPPING] Nočni mir (23–7) — skip'); return; }
         console.log('[SHIPPING] Hourly refresh...');
         generateShippingSpeedData(null).catch(e => console.error('❌ Shipping speed gen failed:', e.message));
     }, 60 * 60 * 1000);
@@ -4642,12 +4659,14 @@ server.listen(PORT, '0.0.0.0', async () => {
     // Live Events: skip on startup, refresh hourly
     console.log('[LIVE-EVENTS] Skipping startup generation — will refresh hourly');
     setInterval(() => {
+        if (isNightQuietHours()) { console.log('[LIVE-EVENTS] Nočni mir (23–7) — skip'); return; }
         console.log('[LIVE-EVENTS] Hourly refresh...');
         generateLiveEvents().catch(e => console.error('[LIVE-EVENTS] Hourly refresh failed:', e.message));
     }, 60 * 60 * 1000);
 
     // Kitajc stock sales — refresh every hour + low stock warning
     setInterval(() => {
+        if (isNightQuietHours()) { console.log('[KITAJC-STOCK] Nočni mir (23–7) — skip'); return; }
         _kitajcSalesCache = null; // invalidate cache
         getKitajcSkuSales()
             .then(r => {
